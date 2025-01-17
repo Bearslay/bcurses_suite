@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+# Binary Output Folder
+bin/
+
+# Useless vs-code Settings
+.vscode/
