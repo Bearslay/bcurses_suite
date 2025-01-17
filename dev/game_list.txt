@@ -1,0 +1,115 @@
+//
+// VERSUS GAMES
+//
+// All games shall include computer bot(s) that can supplement a lack of other real people (like friends)
+
+- tic tac toe
+    - 1 or 2 players
+    - modes
+        - classic
+        - X's only
+    - presets
+        - grid range of 3x3 to 49x49
+            - larger grid sizes are probably only interesting for the X's only mode tbh
+
+- connect 4
+    - 1 or 2 players
+    - presets
+        - classic
+        - custom
+            - min grid size of 8x6 (normal), max of 12x8 perhaps
+
+- shake bingo (cs special)
+    - 1 or 2 players
+    - presets
+        - classic (2d6, 6x6 grid)
+        - custom
+            - min die amount of 1, max of 4
+            - min die faces of 4, max of 20
+            - optional modification: "wild" face is its own value and the amount of wild faces available are computed with: [# of wilds] = [die faces] / 6 (+1 if result is 0)
+
+- stay alive
+    - 1 to 4 players
+    - presets
+        - classic board (need to record combinations)
+        - randomly generate board
+
+- chess
+    - 1 or 2 players (will probably lack a smart computer if one at all for now lmao)
+    - modes
+        - classic chess
+            - including modern rules like en passant, castling, etc
+            - timer settings will be available with presets like bullet/blitz/etc
+        - chess variants
+            - duck chess (this one is most chill i think)
+            - spell chess? (clash of clans spells)
+            - ability chess? (the one with mana and selected special abilities for pieces)
+            - challenge chess (each player is given a random special challenge to play around of semi-similar difficulty)
+
+- checkers
+    - 1 or 2 players
+    - presets
+        - classic (i think; kings are obtained upon promotion)
+        - alt classic (all checkers are kings from the start)
+
+//
+// PUZZLE GAMES
+//
+// All games are 1-player only and will probably involve random generation to ensure replayability
+
+- gerrymandering game
+    - idea
+        - randomly generated board of 2 cell types is created with the goal of making any number of regions containing said cells
+        - all regions must contain the same number of cells in them and may not have equal amounts of each cell type in a region
+        - at the end, the minority cell type must have a majority "vote" by having more regions where the minority is the majority
+            - needs more research to make sure that generated boards are possible 100% of the time and that minimum number of minority cells are used each time
+    - game making
+        - grid range from 6x6 to 32x32
+
+- 2048
+    - presets
+        - classic (4x4 grid, summon either a 2 or a 4 per move)
+        - do research on other popular 2048 presets/gamemodes
+
+- pipe re-arrangement game
+    - idea
+        - generate several "trees of pipes" within a grid using intersections and stuff, then randomly rotate each cell to scramble the puzzle and make a new board
+        - player needs to rotate each pipe to the correct orientation to make everything connect
+    - presets
+        - min grid size of 4x4, max of 64x64
+
+- minesweeper
+    - classic presets
+        - beginner: 9x9 grid w/ 10 mines
+        - intermediate: 16x16 grid w/ 40 mines
+        - expert: 30x16 grid w/ 99 mines
+    - user presets
+        - grid range from 8x8 to 100x100
+        - mines range from 1 to 99999 (max = cells in grid minus 1)
+        - also give "density slider" to calculate mine count from grid size and given slider value
+
+- mastermind
+    - classic presets
+        - beginner: 6 blanks, 8 colors, 12 guesses, no repeats
+        - intermediate: 6 blanks, 8 colors, 12 guesses, possible repeats
+        - expert: 6 blanks, 8 colors, 10 guesses, possible repeats
+    - user presets
+        - blank range from 5 to 10
+        - color range from 6 to 16
+        - guess range from 4 to 50
+        - allow/disallow repeats
+            - exact quantities may need playtesting
+
+- hangman
+    - idea
+        - load in a text file or something of a whole bunch of words to randomly select from
+        - otherwise, its just hangman lol
+
+//
+// MISC GAMES/PROGRAMS
+//
+// These games/programs don't fall into any other category
+
+- conway's game of life
+    - exactly what it sounds like, might need a lot of developing to get it into a good form with an 'infinite" expanse
+    - potentially look into other cellular automata simulation games
