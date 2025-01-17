@@ -9,11 +9,12 @@ class test : public bengine::curses_loop {
                 case 'q':
                     this->loop_running = false;
                     break;
+                case ' ':
+                    this->visuals_changed = true;
+                    break;
             }
         }
-        void compute() {
-            this->visuals_changed = true;
-        }
+        void compute() {}
         void render() {
             mvprintw(0, 0, "%u", this->get_ticks());
         }

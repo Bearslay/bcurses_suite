@@ -15,9 +15,10 @@ namespace bengine {
             static const std::unordered_map<unsigned char, wchar_t> box_drawing_key;
             static const std::unordered_map<char, std::vector<std::wstring>> matrix_text_key;
 
-                static wchar_t default_cell_character;
-                static unsigned char default_cell_color_pair;
-                static unsigned short default_cell_attributes;
+            static wchar_t default_cell_character;
+            static unsigned char default_cell_color_pair;
+            static unsigned short default_cell_attributes;
+            static unsigned short default_box_drawing_style;
 
         public:
             // \brief A number representing one of the first 16 color pairs initialized upon startup (names assume that nothing was changed)
@@ -348,6 +349,17 @@ namespace bengine {
                 refresh();
             }
 
+            // write character to window and return the position of where the cursor would be after writing the character (x + 1 unless wrapping)
+            unsigned short write_character(const unsigned short &x, const unsigned short &y, const wchar_t &character, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes) {
+                if (!this->check_coordinate_bounds(x, y)) {
+                    return x;
+                }
+                this->grid.at(y).at(x).character = character;
+                this->grid.at(y).at(x).color_pair = color;
+                this->grid.at(y).at(x).attributes = attributes;
+                return x == this->get_width() - 1 ? 0 : x + 1;
+            }
+
             void reset_all_cells() {
                 const unsigned short width = this->grid.at(0).size(), height = this->grid.size();
                 this->grid = std::vector<std::vector<bengine::curses_window::cell>>(height, std::vector<bengine::curses_window::cell>(width));
@@ -369,6 +381,7 @@ namespace bengine {
     wchar_t bengine::curses_window::default_cell_character = L' ';
     unsigned char bengine::curses_window::default_cell_color_pair = 1;
     unsigned short bengine::curses_window::default_cell_attributes = 1024;
+    unsigned short bengine::curses_window::default_box_drawing_style = static_cast<unsigned short>(bengine::curses_window::box_drawing_styles::LIGHT_SQUARE) | static_cast<unsigned short>(bengine::curses_window::box_drawing_styles::NO_DASH);
     const std::unordered_map<unsigned char, wchar_t> bengine::curses_window::box_drawing_key = {
         {5, L'┌'}, {6, L'┎'}, {7, L'╓'}, {9, L'┍'},
         {10, L'┏'}, {13, L'╒'}, {15, L'╔'}, {17, L'┐'}, {18, L'┒'}, {19, L'╖'},

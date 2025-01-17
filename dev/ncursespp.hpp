@@ -95,10 +95,6 @@
 namespace npp {
     /// @brief Default values that can be changed in place of providing parameter arguments for many functions
     static struct {
-        /// @brief Color pair
-        unsigned char Color = NPP_WHITE;
-        /// @brief The set of attributes to use by default when writing to the window
-        std::string Attributes = "";
         /// @brief The pair of y (row) and x (col) offsets to use when chaining writing functions
         std::pair<unsigned short, unsigned short> Offset = {0, 1};
         /// @brief Whether to wrap to the starting x or to the window's x
@@ -113,7 +109,6 @@ namespace npp {
 
         bool UsePadding = true;
 
-        std::pair<unsigned char, unsigned char> Style = {LIGHT_HARD, DASHED_NONE};
         bool Mergeable = true;
         bool CanMerge = true;
     } Defaults;
