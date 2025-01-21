@@ -3,20 +3,24 @@
 class test : public bengine::curses_loop {
     private:
         bengine::curses_window window;
+
+        unsigned short repeats = 0;
     
         void handle_event() {
             switch (this->input_character) {
                 case 'q':
                     this->loop_running = false;
                     break;
-                case ' ':
+                case 'a':
+                    this->window.write_character(repeats, 0, L'a');
+                    repeats++;
                     this->visuals_changed = true;
                     break;
             }
         }
         void compute() {}
         void render() {
-            mvprintw(0, 0, "%u", this->get_ticks());
+            this->window.present_window();
         }
 
     public:

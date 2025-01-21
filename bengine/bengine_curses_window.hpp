@@ -23,22 +23,22 @@ namespace bengine {
         public:
             // \brief A number representing one of the first 16 color pairs initialized upon startup (names assume that nothing was changed)
             enum class preset_colors : unsigned char {
-                BLACK,         // preset_color representing black (0, 0, 0)
-                WHITE,         // preset_color representing white (255, 255, 255)
-                LIGHT_GRAY,    // preset_color representing light gray (170, 170, 170)
-                DARK_GRAY,     // preset_color representing dark gray (85, 85, 85)
-                BROWN,         // preset_color representing brown (117, 60, 19)
-                RED,           // preset_color representing red (255, 0, 0)
-                MAROON,        // preset_color representing maroon (115, 0, 0)
-                ORANGE,        // preset_color representing orange (255, 115, 0)
-                YELLOW,        // preset_color representing yellow (255, 255, 0)
-                LIME,          // preset_color representing lime (0, 255, 0)
-                GREEN,         // preset_color representing green (0, 115, 0)
-                CYAN,          // preset_color representing cyan (0, 255, 255)
-                TEAL,          // preset_color representing teal (0, 115, 115)
-                BLUE,          // preset_color representing blue (0, 0, 255)
-                MAGENTA,       // preset_color representing magenta (255, 0, 255)
-                PURPLE         // preset_color representing purple (115, 0, 115)
+                BLACK = 0,         // preset_color representing black (0, 0, 0)
+                WHITE = 1,         // preset_color representing white (255, 255, 255)
+                LIGHT_GRAY = 2,    // preset_color representing light gray (170, 170, 170)
+                DARK_GRAY = 3,     // preset_color representing dark gray (85, 85, 85)
+                BROWN = 4,         // preset_color representing brown (117, 60, 19)
+                RED = 5,           // preset_color representing red (255, 0, 0)
+                MAROON = 6,        // preset_color representing maroon (115, 0, 0)
+                ORANGE = 7,        // preset_color representing orange (255, 115, 0)
+                YELLOW = 8,        // preset_color representing yellow (255, 255, 0)
+                LIME = 9,          // preset_color representing lime (0, 255, 0)
+                GREEN = 10,        // preset_color representing green (0, 115, 0)
+                CYAN = 11,         // preset_color representing cyan (0, 255, 255)
+                TEAL = 12,         // preset_color representing teal (0, 115, 115)
+                BLUE = 13,         // preset_color representing blue (0, 0, 255)
+                MAGENTA = 14,      // preset_color representing magenta (255, 0, 255)
+                PURPLE = 15        // preset_color representing purple (115, 0, 115)
             };
 
             // \brief Different primary and dash styles to be used when utilizing the box drawing functions of a bengine::curses_window; note that doubled can't cleanly merge with heavy and that doubled also can't be dashed
@@ -310,7 +310,7 @@ namespace bengine {
                         if (col < 0) {
                             continue;
                         }
-                        if (col >= LINES) {
+                        if (col >= COLS) {
                             break;
                         }
                         this->apply_cell_to_screen(col, row);
@@ -334,7 +334,7 @@ namespace bengine {
                         if (col < 0) {
                             continue;
                         }
-                        if (col >= LINES) {
+                        if (col >= COLS) {
                             break;
                         }
                         mvaddch(row, col, ' ');
