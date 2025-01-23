@@ -32,11 +32,8 @@ namespace bengine {
 
             int input_character = ERR;
 
-            unsigned short terminal_cols = COLS;
-            unsigned short terminal_rows = LINES;
-
-            unsigned short minimum_cols = 250;
-            unsigned short minimum_rows = 20;
+            unsigned short minimum_cols = 1;
+            unsigned short minimum_rows = 1;
 
             virtual void handle_event() = 0;
             virtual void compute() = 0;
@@ -52,6 +49,7 @@ namespace bengine {
                 initscr();
                 noecho();
                 curs_set(0);
+                raw();
                 nodelay(stdscr, true);
 
                 if (!can_change_color() || !has_colors()) {
@@ -104,17 +102,13 @@ namespace bengine {
                 unsigned long long frame_ticks = 0;
                 long double current_time = this->get_ticks() * 0.01;
                 long double new_time = 0.0;
-                double frame_time = 0.0;
                 double accumulator = 0.0;
 
                 while (this->loop_running) {
-                    getmaxyx(stdscr, this->terminal_rows, this->terminal_cols);
-
                     start_ticks = this->get_ticks();
                     new_time = this->get_ticks() * 0.01;
-                    frame_time = new_time - current_time;
+                    accumulator += new_time - current_time;
                     current_time = new_time;
-                    accumulator += frame_time;
 
                     while (accumulator >= this->delta_time) {
                         if ((this->input_character = getch()) != ERR) {
@@ -134,7 +128,7 @@ namespace bengine {
                         napms(1000 / this->refresh_rate - frame_ticks);
                     }
 
-                    if (this->terminal_cols < this->minimum_cols || this->terminal_rows < this->minimum_rows) {
+                    if (COLS < this->minimum_cols || LINES < this->minimum_rows) {
                         short r1, g1, b1, r2, g2, b2, r3, g3, b3, r4, g4, b4;
                         color_content( 0, &r1, &g1, &b1);
                         color_content( 1, &r2, &g2, &b2);
@@ -153,25 +147,44 @@ namespace bengine {
                         init_pair( 5,  5, 0);
                         init_pair(10, 10, 0);
 
-                        while (this->terminal_cols < this->minimum_cols || this->terminal_rows < this->minimum_rows) {
-                            attron(COLOR_PAIR(1));
+                        unsigned short current_cols = COLS + 1, current_rows = LINES + 1;
+                        unsigned short line_1_col = 0, line_2_col = 0;
+                        while (COLS < this->minimum_cols || LINES < this->minimum_rows) {
+                            start_ticks = this->get_ticks();
 
-                            clear();
-                            mvprintw(this->terminal_rows / 2 - 2, this->terminal_cols / 2 - 12, "Terminal Size Too Small");
-                            mvprintw(this->terminal_rows / 2 - 1, this->terminal_cols / 2 - 9 - static_cast<unsigned char>(std::log10(this->terminal_cols)) - static_cast<unsigned char>(std::log10(this->terminal_rows)), "Width = %d Height = %d", this->terminal_cols, this->terminal_rows);
-                            mvprintw(this->terminal_rows / 2 + 1, this->terminal_cols / 2 - 13, "Needed For Current Config:");
-                            mvprintw(this->terminal_rows / 2 + 2, this->terminal_cols / 2 - 9 - static_cast<unsigned char>(std::log10(this->minimum_cols)) - static_cast<unsigned char>(std::log10(this->minimum_rows)), "Width = %d Height = %d", this->minimum_cols, this->minimum_rows);
+                            if (current_cols != COLS || current_rows != LINES) {
+                                current_cols = COLS;
+                                current_rows = LINES;
+                                line_1_col = COLS / 2 - 9 - (static_cast<unsigned char>(std::log10(COLS)) + static_cast<unsigned char>(std::log10(LINES)) + 2) / 2;
+                                line_2_col = COLS / 2 - 9 - (static_cast<unsigned char>(std::log10(this->minimum_cols)) + static_cast<unsigned char>(std::log10(this->minimum_rows)) + 2) / 2;
 
-                            attron(COLOR_PAIR(this->terminal_cols < this->minimum_cols ? 5 : 10));
-                            mvprintw(this->terminal_rows / 2 - 1, this->terminal_cols / 2 - 2 - static_cast<unsigned char>(std::log10(this->terminal_cols)), "%d", this->terminal_cols);
+                                clear();
+                                attron(COLOR_PAIR(1));
 
-                            attron(COLOR_PAIR(this->terminal_rows < this->minimum_rows ? 5 : 10));
-                            mvprintw(this->terminal_rows / 2 - 1, this->terminal_cols / 2 + 10 - static_cast<unsigned char>(std::log10(this->terminal_rows)), "%d", this->terminal_rows);
+                                mvprintw(LINES / 2 - 2, COLS / 2 - 11, "Terminal Size Too Small");
+                                mvprintw(LINES / 2 - 1, line_1_col, "Width = %d Height = %d", COLS, LINES);
+                                mvprintw(LINES / 2 + 1, COLS / 2 - 13, "Needed For Current Config:");
+                                mvprintw(LINES / 2 + 2, line_2_col, "Width = %d Height = %d", this->minimum_cols, this->minimum_rows);
+
+                                attron(COLOR_PAIR(COLS < this->minimum_cols ? 5 : 10));
+                                mvprintw(LINES / 2 - 1, line_1_col + 8, "%d", COLS);
+
+                                attron(COLOR_PAIR(LINES < this->minimum_rows ? 5 : 10));
+                                mvprintw(LINES / 2 - 1, line_1_col + 19 + static_cast<unsigned char>(std::log10(COLS)), "%d", LINES);
+
+                                attroff(COLOR_PAIR(LINES < this->minimum_rows ? 5 : 10));
+                            }
+
+                            if ((this->input_character = getch()) == 'q') {
+                                this->loop_running = false;
+                                break;
+                            }
 
                             refresh();
 
-                            attroff(COLOR_PAIR(this->terminal_rows < this->minimum_rows ? 5 : 10));
-                            getmaxyx(stdscr, this->terminal_rows, this->terminal_cols);
+                            if ((frame_ticks = this->get_ticks() - start_ticks) < (unsigned long long)(1000 / this->refresh_rate)) {
+                                napms(1000 / this->refresh_rate - frame_ticks);
+                            }
                         }
                         clear();
                         this->visuals_changed = true;
