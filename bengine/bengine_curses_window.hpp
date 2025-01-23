@@ -22,7 +22,7 @@ namespace bengine {
 
         public:
             // \brief A number representing one of the first 16 color pairs initialized upon startup (names assume that nothing was changed)
-            enum class preset_colors : unsigned char {
+            enum preset_colors : unsigned char {
                 BLACK = 0,         // preset_color representing black (0, 0, 0)
                 WHITE = 1,         // preset_color representing white (255, 255, 255)
                 LIGHT_GRAY = 2,    // preset_color representing light gray (170, 170, 170)
@@ -42,7 +42,7 @@ namespace bengine {
             };
 
             // \brief Different primary and dash styles to be used when utilizing the box drawing functions of a bengine::curses_window; note that doubled can't cleanly merge with heavy and that doubled also can't be dashed
-            enum class box_drawing_styles : unsigned short {
+            enum box_drawing_styles : unsigned short {
                 LIGHT_SQUARE = 1,           // box_drawing_style representing light lines in both the horizontal and vertical directions where corner characters are square
                 LIGHT_ROUNDED = 2,          // box_drawing_style representing light lines in both the horizontal and vertical directions where corner characters are rounded
                 HEAVY_BOTH = 4,             // box_drawing_style representing heavy lines in both the horizontal and vertical directions
@@ -60,7 +60,7 @@ namespace bengine {
             };
 
             // \brief Different attributes of a cell supported by ncurses or bengine
-            enum class cell_attributes : unsigned short {
+            enum cell_attributes : unsigned short {
                 BOLD = 1,                      // cell_attribute representing whether the cell is bolded or not
                 ITALIC = 2,                    // cell_attribute representing whether the cell is italicized or not
                 UNDERLINED = 4,                // cell_attribute representing whether the cell is underlined or not
@@ -105,75 +105,75 @@ namespace bengine {
                     mvaddwstr(y, x, std::wstring(1, this->grid.at(y).at(x).character).c_str());
                 }
 
-                this->toggle_attributes(this->grid.at(y).at(x).attributes, true);
+                this->toggle_attributes(this->grid.at(y).at(x).attributes, false);
                 attroff(COLOR_PAIR(this->grid.at(y).at(x).color_pair));
             }
 
-            void toggle_attributes(const unsigned char &attributes, const bool &attribute_state) const {
-                if (bengine::bitwise_manipulator::get_bit_state(attributes, static_cast<unsigned char>(bengine::curses_window::cell_attributes::BOLD))) {
+            void toggle_attributes(const unsigned short &attributes, const bool &attribute_state) const {
+                if (bengine::bitwise_manipulator::check_for_activated_bits(attributes, static_cast<unsigned short>(bengine::curses_window::cell_attributes::BOLD))) {
                     if (attribute_state) {
                         attron(A_BOLD);
                     } else {
                         attroff(A_BOLD);
                     }
                 }
-                if (bengine::bitwise_manipulator::get_bit_state(attributes, static_cast<unsigned char>(bengine::curses_window::cell_attributes::ITALIC))) {
+                if (bengine::bitwise_manipulator::check_for_activated_bits(attributes, static_cast<unsigned short>(bengine::curses_window::cell_attributes::ITALIC))) {
                     if (attribute_state) {
                         attron(A_ITALIC);
                     } else {
                         attroff(A_ITALIC);
                     }
                 }
-                if (bengine::bitwise_manipulator::get_bit_state(attributes, static_cast<unsigned char>(bengine::curses_window::cell_attributes::UNDERLINED))) {
+                if (bengine::bitwise_manipulator::check_for_activated_bits(attributes, static_cast<unsigned short>(bengine::curses_window::cell_attributes::UNDERLINED))) {
                     if (attribute_state) {
                         attron(A_UNDERLINE);
                     } else {
                         attroff(A_UNDERLINE);
                     }
                 }
-                if (bengine::bitwise_manipulator::get_bit_state(attributes, static_cast<unsigned char>(bengine::curses_window::cell_attributes::REVERSED_COLOR))) {
+                if (bengine::bitwise_manipulator::check_for_activated_bits(attributes, static_cast<unsigned short>(bengine::curses_window::cell_attributes::REVERSED_COLOR))) {
                     if (attribute_state) {
                         attron(A_REVERSE);
                     } else {
                         attroff(A_REVERSE);
                     }
                 }
-                if (bengine::bitwise_manipulator::get_bit_state(attributes, static_cast<unsigned char>(bengine::curses_window::cell_attributes::BLINKING))) {
+                if (bengine::bitwise_manipulator::check_for_activated_bits(attributes, static_cast<unsigned short>(bengine::curses_window::cell_attributes::BLINKING))) {
                     if (attribute_state) {
                         attron(A_BLINK);
                     } else {
                         attroff(A_BLINK);
                     }
                 }
-                if (bengine::bitwise_manipulator::get_bit_state(attributes, static_cast<unsigned char>(bengine::curses_window::cell_attributes::DIM))) {
+                if (bengine::bitwise_manipulator::check_for_activated_bits(attributes, static_cast<unsigned short>(bengine::curses_window::cell_attributes::DIM))) {
                     if (attribute_state) {
                         attron(A_DIM);
                     } else {
                         attroff(A_DIM);
                     }
                 }
-                if (bengine::bitwise_manipulator::get_bit_state(attributes, static_cast<unsigned char>(bengine::curses_window::cell_attributes::INVISIBLE))) {
+                if (bengine::bitwise_manipulator::check_for_activated_bits(attributes, static_cast<unsigned short>(bengine::curses_window::cell_attributes::INVISIBLE))) {
                     if (attribute_state) {
                         attron(A_INVIS);
                     } else {
                         attroff(A_INVIS);
                     }
                 }
-                if (bengine::bitwise_manipulator::get_bit_state(attributes, static_cast<unsigned char>(bengine::curses_window::cell_attributes::STANDOUT))) {
+                if (bengine::bitwise_manipulator::check_for_activated_bits(attributes, static_cast<unsigned short>(bengine::curses_window::cell_attributes::STANDOUT))) {
                     if (attribute_state) {
                         attron(A_STANDOUT);
                     } else {
                         attroff(A_STANDOUT);
                     }
                 }
-                if (bengine::bitwise_manipulator::get_bit_state(attributes, static_cast<unsigned char>(bengine::curses_window::cell_attributes::PROTECTED))) {
+                if (bengine::bitwise_manipulator::check_for_activated_bits(attributes, static_cast<unsigned short>(bengine::curses_window::cell_attributes::PROTECTED))) {
                     if (attribute_state) {
                         attron(A_PROTECT);
                     } else {
                         attroff(A_PROTECT);
                     }
                 }
-                if (bengine::bitwise_manipulator::get_bit_state(attributes, static_cast<unsigned char>(bengine::curses_window::cell_attributes::ALTERNATE_CHARACTER))) {
+                if (bengine::bitwise_manipulator::check_for_activated_bits(attributes, static_cast<unsigned short>(bengine::curses_window::cell_attributes::ALTERNATE_CHARACTER))) {
                     if (attribute_state) {
                         attron(A_ALTCHARSET);
                     } else {
@@ -288,20 +288,23 @@ namespace bengine {
                 return this->check_coordinate_bounds(x, y) ? this->grid.at(y).at(x).character : bengine::curses_window::default_cell_character;
             }
             // get desired cell's color pair, if the cell is out of bounds then return 1 (cell default)
-            unsigned char get_cell_color_pair(const unsigned short &x, const unsigned short &y) const {
+            unsigned char get_cell_color(const unsigned short &x, const unsigned short &y) const {
                 return this->check_coordinate_bounds(x, y) ? this->grid.at(y).at(x).color_pair : bengine::curses_window::default_cell_color_pair;
             }
             unsigned short get_cell_attributes(const unsigned short &x, const unsigned short &y) const {
                 return this->check_coordinate_bounds(x, y) ? this->grid.at(y).at(x).attributes : bengine::curses_window::default_cell_attributes;
             }
+            bengine::curses_window::cell get_cell(const unsigned short &x, const unsigned short &y) const {
+                return this->check_coordinate_bounds(x, y) ? this->grid.at(y).at(x) : bengine::curses_window::cell();
+            }
 
             // see if a cell has the desired attributes active or not
-            bool check_cell_attribute_states(const unsigned short &x, const unsigned short &y, const bengine::curses_window::cell_attributes &attributes) const {
+            bool check_cell_attribute_states(const unsigned short &x, const unsigned short &y, const unsigned short &attributes) const {
                 return this->check_coordinate_bounds(x, y) && bengine::bitwise_manipulator::check_for_activated_bits(this->grid.at(y).at(x).attributes, static_cast<unsigned short>(attributes));
             }
 
-            void present_window() const {
-                if (this->get_left_x() >= COLS || this->get_right_x() < 0 || this->get_top_y() < 0 || this->get_bottom_y() >= LINES) {
+            void apply_to_screen() const {
+                if (this->get_left_x() >= COLS || this->get_right_x() < 0 || this->get_bottom_y() < 0 || this->get_top_y() >= LINES) {
                     return;
                 }
 
@@ -322,10 +325,33 @@ namespace bengine {
                         return;
                     }
                 }
-                refresh();
             }
-            void clear_window() const {
-                if (this->get_left_x() >= COLS || this->get_right_x() < 0 || this->get_top_y() < 0 || this->get_bottom_y() >= LINES) {
+            void apply_region_to_screen(const unsigned short &x, const unsigned short &y, const unsigned short &width, const unsigned short &height) const {
+                if (this->get_left_x() + x >= COLS || this->get_left_x() + x + width < 0 || this->get_top_y() + y + height < 0 || this->get_top_y() + y >= LINES) {
+                    return;
+                }
+
+                for (int row = this->y_pos + y; row < this->y_pos + y + height; row++) {
+                    for (int col = this->x_pos + x; col < this->x_pos + x + width; col++) {
+                        if (col < 0) {
+                            continue;
+                        }
+                        if (col >= COLS || col >= this->get_width()) {
+                            break;
+                        }
+                        this->apply_cell_to_screen(col, row);
+                    }
+                    if (row < 0) {
+                        continue;
+                    }
+                    if (row >= LINES || row >= this->get_height()) {
+                        return;
+                    }
+                }
+            }
+
+            void clear_from_screen() const {
+                if (this->get_left_x() >= COLS || this->get_right_x() < 0 || this->get_bottom_y() < 0 || this->get_top_y() >= LINES) {
                     return;
                 }
 
@@ -346,18 +372,40 @@ namespace bengine {
                         return;
                     }
                 }
-                refresh();
+            }
+            void clear_region_from_screen(const unsigned short &x, const unsigned short &y, const unsigned short &width, const unsigned short &height) const {
+                if (this->get_left_x() + x >= COLS || this->get_left_x() + x + width < 0 || this->get_top_y() + y + height < 0 || this->get_top_y() + y >= LINES) {
+                    return;
+                }
+
+                for (int row = this->y_pos + y; row < this->y_pos + y + height; row++) {
+                    for (int col = this->x_pos + x; col < this->x_pos + x + width; col++) {
+                        if (col < 0) {
+                            continue;
+                        }
+                        if (col >= COLS || col >= this->get_width()) {
+                            break;
+                        }
+                        mvaddch(row, col, ' ');
+                    }
+                    if (row < 0) {
+                        continue;
+                    }
+                    if (row >= LINES || row >= this->get_height()) {
+                        return;
+                    }
+                }
             }
 
             // write character to window and return the position of where the cursor would be after writing the character (x + 1 unless wrapping)
-            unsigned short write_character(const unsigned short &x, const unsigned short &y, const wchar_t &character, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes) {
+            unsigned int write_character(const unsigned short &x, const unsigned short &y, const wchar_t &character, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes) {
                 if (!this->check_coordinate_bounds(x, y)) {
                     return x;
                 }
                 this->grid.at(y).at(x).character = character;
                 this->grid.at(y).at(x).color_pair = color;
                 this->grid.at(y).at(x).attributes = attributes;
-                return x == this->get_width() - 1 ? 0 : x + 1;
+                return (x == this->get_width() - 1 ? y + 1 : y) * this->get_width() + (x == this->get_width() - 1 ? 0 : x + 1);
             }
 
             void reset_all_cells() {
@@ -381,7 +429,7 @@ namespace bengine {
     wchar_t bengine::curses_window::default_cell_character = L' ';
     unsigned char bengine::curses_window::default_cell_color_pair = 1;
     unsigned short bengine::curses_window::default_cell_attributes = 1024;
-    unsigned short bengine::curses_window::default_box_drawing_style = static_cast<unsigned short>(bengine::curses_window::box_drawing_styles::LIGHT_SQUARE) | static_cast<unsigned short>(bengine::curses_window::box_drawing_styles::NO_DASH);
+    unsigned short bengine::curses_window::default_box_drawing_style = bengine::curses_window::box_drawing_styles::LIGHT_SQUARE | bengine::curses_window::box_drawing_styles::NO_DASH;
     const std::unordered_map<unsigned char, wchar_t> bengine::curses_window::box_drawing_key = {
         {5, L'┌'}, {6, L'┎'}, {7, L'╓'}, {9, L'┍'},
         {10, L'┏'}, {13, L'╒'}, {15, L'╔'}, {17, L'┐'}, {18, L'┒'}, {19, L'╖'},
@@ -401,7 +449,11 @@ namespace bengine {
         {150, L'╂'}, {152, L'┺'}, {153, L'╄'}, {154, L'╊'},
         {160, L'┛'}, {161, L'┩'}, {162, L'┫'}, {164, L'┹'}, {165, L'╃'}, {166, L'╉'}, {168, L'┻'}, {169, L'╇'},
         {170, L'╋'},
-        {195, L'║'}, {196, L'╙'}, {199, L'╟'}, {204, L'╚'}, {207, L'╠'}, {208, L'╜'}, {211, L'╢'}, {212, L'╨'}, {215, L'╫'}, {240, L'╝'}, {243, L'╣'}, {252, L'╩'}, {255, L'╬'}
+        {195, L'║'}, {196, L'╙'}, {199, L'╟'},
+        {204, L'╚'}, {207, L'╠'}, {208, L'╜'},
+        {211, L'╢'}, {212, L'╨'}, {215, L'╫'},
+        {240, L'╝'}, {243, L'╣'},
+        {252, L'╩'}, {255, L'╬'}
     };
     const std::unordered_map<char, std::vector<std::wstring>> bengine::curses_window::matrix_text_key = {
         {' ', {L"         ", L"                "}},
