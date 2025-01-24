@@ -3,9 +3,7 @@
 
 #include <ncurses.h>
 #include <locale.h>
-#include <vector>
 #include <unordered_map>
-#include <string>
 
 #include "bengine_helpers.hpp"
 
@@ -19,59 +17,66 @@ namespace bengine {
             static unsigned char default_cell_color_pair;
             static unsigned short default_cell_attributes;
             static unsigned short default_box_drawing_style;
+            static bengine::curses_window::wrapping_modes default_wrapping_mode;
 
         public:
             // \brief A number representing one of the first 16 color pairs initialized upon startup (names assume that nothing was changed)
             enum preset_colors : unsigned char {
-                BLACK = 0,         // preset_color representing black (0, 0, 0)
-                WHITE = 1,         // preset_color representing white (255, 255, 255)
-                LIGHT_GRAY = 2,    // preset_color representing light gray (170, 170, 170)
-                DARK_GRAY = 3,     // preset_color representing dark gray (85, 85, 85)
-                BROWN = 4,         // preset_color representing brown (117, 60, 19)
-                RED = 5,           // preset_color representing red (255, 0, 0)
-                MAROON = 6,        // preset_color representing maroon (115, 0, 0)
-                ORANGE = 7,        // preset_color representing orange (255, 115, 0)
-                YELLOW = 8,        // preset_color representing yellow (255, 255, 0)
-                LIME = 9,          // preset_color representing lime (0, 255, 0)
-                GREEN = 10,        // preset_color representing green (0, 115, 0)
-                CYAN = 11,         // preset_color representing cyan (0, 255, 255)
-                TEAL = 12,         // preset_color representing teal (0, 115, 115)
-                BLUE = 13,         // preset_color representing blue (0, 0, 255)
-                MAGENTA = 14,      // preset_color representing magenta (255, 0, 255)
-                PURPLE = 15        // preset_color representing purple (115, 0, 115)
+                BLACK = 0,         // black (0, 0, 0)
+                WHITE = 1,         // white (255, 255, 255)
+                LIGHT_GRAY = 2,    // light gray (170, 170, 170)
+                DARK_GRAY = 3,     // dark gray (85, 85, 85)
+                BROWN = 4,         // brown (117, 60, 19)
+                RED = 5,           // red (255, 0, 0)
+                MAROON = 6,        // maroon (115, 0, 0)
+                ORANGE = 7,        // orange (255, 115, 0)
+                YELLOW = 8,        // yellow (255, 255, 0)
+                LIME = 9,          // lime (0, 255, 0)
+                GREEN = 10,        // green (0, 115, 0)
+                CYAN = 11,         // cyan (0, 255, 255)
+                TEAL = 12,         // teal (0, 115, 115)
+                BLUE = 13,         // blue (0, 0, 255)
+                MAGENTA = 14,      // magenta (255, 0, 255)
+                PURPLE = 15        // purple (115, 0, 115)
             };
 
             // \brief Different primary and dash styles to be used when utilizing the box drawing functions of a bengine::curses_window; note that doubled can't cleanly merge with heavy and that doubled also can't be dashed
             enum box_drawing_styles : unsigned short {
-                LIGHT_SQUARE = 1,           // box_drawing_style representing light lines in both the horizontal and vertical directions where corner characters are square
-                LIGHT_ROUNDED = 2,          // box_drawing_style representing light lines in both the horizontal and vertical directions where corner characters are rounded
-                HEAVY_BOTH = 4,             // box_drawing_style representing heavy lines in both the horizontal and vertical directions
-                HEAVY_HORIZONTAL = 8,       // box_drawing_style representing heavy lines only in the horizontal direction with light lines in the vertical direction
-                HEAVY_VERTICAL = 16,        // box_drawing_style representing heavy lines only in the vertical direction with light lines in the horizontal direction
-                DOUBLED_BOTH = 32,          // box_drawing_style representing doubled lines in both the horizontal and vertical directions
-                DOUBLED_HORIZONTAL = 64,    // box_drawing_style representing doubled lines only in the horizontal direction with light lines in the vertical direction
-                DOUBLED_VERTICAL = 128,     // box_drawing_style representing doubled lines only in the vertical direction with light lines in the horizontal direction
-                NO_DASH = 256,              // box_drawing_dash_style representing a line with no gaps
-                DOUBLE_DASH = 512,          // box_drawing_dash_style representing a line with 1 gap
-                TRIPLE_DASH = 1024,         // box_drawing_dash_style representing a line with 2 gaps
-                QUADRUPLE_DASH = 2048,      // box_drawing_dash_style representing a line with 3 gaps
-                SINGLE_DASH_1 = 4096,       // box_drawing_dash_style representing the first variation of a line with 1 large gap using half of the character
-                SINGLE_DASH_2 = 8192        // box_drawing_dash_style representing the second variation of a line with 1 large gap using half of the character
+                LIGHT_SQUARE = 1,           // light lines in both the horizontal and vertical directions where corner characters are square
+                LIGHT_ROUNDED = 2,          // light lines in both the horizontal and vertical directions where corner characters are rounded
+                HEAVY_BOTH = 4,             // heavy lines in both the horizontal and vertical directions
+                HEAVY_HORIZONTAL = 8,       // heavy lines only in the horizontal direction with light lines in the vertical direction
+                HEAVY_VERTICAL = 16,        // heavy lines only in the vertical direction with light lines in the horizontal direction
+                DOUBLED_BOTH = 32,          // doubled lines in both the horizontal and vertical directions
+                DOUBLED_HORIZONTAL = 64,    // doubled lines only in the horizontal direction with light lines in the vertical direction
+                DOUBLED_VERTICAL = 128,     // doubled lines only in the vertical direction with light lines in the horizontal direction
+                NO_DASH = 256,              // a line with no gaps
+                DOUBLE_DASH = 512,          // a line with 1 gap
+                TRIPLE_DASH = 1024,         // a line with 2 gaps
+                QUADRUPLE_DASH = 2048,      // a line with 3 gaps
+                SINGLE_DASH_1 = 4096,       // the first variation of a line with 1 large gap using half of the character
+                SINGLE_DASH_2 = 8192        // the second variation of a line with 1 large gap using half of the character
+            };
+
+            enum class wrapping_modes : unsigned char {
+                NONE = 1,       // do not wrap at all
+                BASIC = 2,      // wrap to the left edge of a window (where x = 0)
+                INDENTED = 3    // wrap to the x-position that the string/int/whatever originated at
             };
 
             // \brief Different attributes of a cell supported by ncurses or bengine
             enum cell_attributes : unsigned short {
-                BOLD = 1,                      // cell_attribute representing whether the cell is bolded or not
-                ITALIC = 2,                    // cell_attribute representing whether the cell is italicized or not
-                UNDERLINED = 4,                // cell_attribute representing whether the cell is underlined or not
-                REVERSED_COLOR = 8,            // cell_attribute representing whether the cell's foreground color and background color are reversed or not (good for highlighting in many cases)
-                BLINKING = 16,                 // cell_attribute representing whether the cell blinks or not
-                DIM = 32,                      // cell_attribute representing whether the cell is dim or not
-                INVISIBLE = 64,                // cell_attribute representing whether the cell is invisible or not
-                STANDOUT = 128,                // cell_attribute representing whether the cell "stands out" or not
-                PROTECTED = 256,               // cell_attribute representing whether the cell is "protected" or not
-                ALTERNATE_CHARACTER = 512,     // cell_attribute representing whether the cell uses the alternate ncurses character set or not
-                BOX_DRAWING_MERGABLE = 1024    // cell_attribute representing whether the cell (if a box drawing character) "merges" with other box drawing characters rather than be overridden & ignored
+                BOLD = 1,                      // whether the cell is bolded or not
+                ITALIC = 2,                    // whether the cell is italicized or not
+                UNDERLINED = 4,                // whether the cell is underlined or not
+                REVERSED_COLOR = 8,            // whether the cell's foreground color and background color are reversed or not (good for highlighting in many cases)
+                BLINKING = 16,                 // whether the cell blinks or not
+                DIM = 32,                      // whether the cell is dim or not
+                INVISIBLE = 64,                // whether the cell is invisible or not
+                STANDOUT = 128,                // whether the cell "stands out" or not
+                PROTECTED = 256,               // whether the cell is "protected" or not
+                ALTERNATE_CHARACTER = 512,     // whether the cell uses the alternate ncurses character set or not
+                BOX_DRAWING_MERGABLE = 1024    // whether the cell (if a box drawing character) "merges" with other box drawing characters rather than be overridden & ignored
             };
 
             // \brief A single cell within the grid that makes up a window containing its character, color, and other attributes
@@ -184,6 +189,9 @@ namespace bengine {
 
             bool check_coordinate_bounds(const unsigned short &x, const unsigned short &y) const {
                 return x < this->get_width() && y < this->get_height();
+            }
+            bool check_coordinate_bounds(const std::pair<unsigned short, unsigned short> &pos) const {
+                return this->check_coordinate_bounds(pos.first, pos.second);
             }
 
         public:
@@ -398,19 +406,72 @@ namespace bengine {
             }
 
             // write character to window and return the position of where the cursor would be after writing the character (x + 1 unless wrapping)
-            unsigned int write_character(const unsigned short &x, const unsigned short &y, const wchar_t &character, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes) {
+            std::pair<unsigned short, unsigned short> write_character(const unsigned short &x, const unsigned short &y, const wchar_t &character, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes, const bengine::curses_window::wrapping_modes &wrapping_mode = bengine::curses_window::default_wrapping_mode) {
                 if (!this->check_coordinate_bounds(x, y)) {
-                    return x;
+                    return std::make_pair(x, y);
                 }
+
                 this->grid.at(y).at(x).character = character;
                 this->grid.at(y).at(x).color_pair = color;
                 this->grid.at(y).at(x).attributes = attributes;
-                return (x == this->get_width() - 1 ? y + 1 : y) * this->get_width() + (x == this->get_width() - 1 ? 0 : x + 1);
+
+                if (x >= this->get_width() - 1) {
+                    switch (wrapping_mode) {
+                        case bengine::curses_window::wrapping_modes::NONE:
+                            return std::make_pair(x + 1, y);
+                        default:
+                        case bengine::curses_window::wrapping_modes::BASIC:
+                            return std::make_pair(0, y + 1);
+                        case bengine::curses_window::wrapping_modes::INDENTED:
+                            return std::make_pair(x, y);
+                    }
+                }
+                return std::make_pair(x + 1, y);
+            }
+            std::pair<unsigned short, unsigned short> write_character(const std::pair<unsigned short, unsigned short> &pos, const wchar_t &character, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes, const bengine::curses_window::wrapping_modes &wrapping_mode = bengine::curses_window::default_wrapping_mode) {
+                return this->write_character(pos.first, pos.second, character, color, attributes, wrapping_mode);
+            }
+
+            std::pair<unsigned short, unsigned short> write_string(const unsigned short &x, const unsigned short &y, const std::wstring &string, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes, const bengine::curses_window::wrapping_modes &wrapping_mode = bengine::curses_window::default_wrapping_mode) {
+                if (!this->check_coordinate_bounds(x, y)) {
+                    return std::make_pair(x, y);
+                }
+
+                std::pair<unsigned short, unsigned short> pos = std::make_pair(x, y);
+                for (std::size_t i = 0; i < string.length(); i++) {
+                    this->grid.at(pos.second).at(pos.first).character = string.at(i);
+                    this->grid.at(pos.second).at(pos.first).color_pair = color;
+                    this->grid.at(pos.second).at(pos.first).attributes = attributes;
+
+                    if (pos.first >= this->get_width() - 1) {
+                        switch (wrapping_mode) {
+                            case bengine::curses_window::wrapping_modes::NONE:
+                                return std::make_pair(pos.first + 1, pos.second);
+                            default:
+                            case bengine::curses_window::wrapping_modes::BASIC:
+                                pos.first = 0;
+                                break;
+                            case bengine::curses_window::wrapping_modes::INDENTED:
+                                pos.first = x;
+                                break;
+                        }
+                        pos.second++;
+                        if (pos.second >= this->get_height() - 1) {
+                            break;
+                        }
+                    } else {
+                        pos.first++;
+                    }
+                }
+
+                return pos;
+            }
+            std::pair<unsigned short, unsigned short> write_string(const std::pair<unsigned short, unsigned short> &pos, const std::wstring &string, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes, const bengine::curses_window::wrapping_modes &wrapping_mode = bengine::curses_window::default_wrapping_mode) {
+                return this->write_string(pos.first, pos.second, string, color, attributes, wrapping_mode);
             }
 
             void reset_all_cells() {
-                const unsigned short width = this->grid.at(0).size(), height = this->grid.size();
-                this->grid = std::vector<std::vector<bengine::curses_window::cell>>(height, std::vector<bengine::curses_window::cell>(width));
+                this->grid = std::vector<std::vector<bengine::curses_window::cell>>(this->grid.size(), std::vector<bengine::curses_window::cell>(this->grid.at(0).size()));
             }
             void reset_cells(const unsigned short &x, const unsigned short &y, const unsigned short &width, const unsigned short &height) {
                 for (unsigned short row = y; row < height; row++) {
@@ -430,6 +491,7 @@ namespace bengine {
     unsigned char bengine::curses_window::default_cell_color_pair = 1;
     unsigned short bengine::curses_window::default_cell_attributes = 1024;
     unsigned short bengine::curses_window::default_box_drawing_style = bengine::curses_window::box_drawing_styles::LIGHT_SQUARE | bengine::curses_window::box_drawing_styles::NO_DASH;
+    bengine::curses_window::wrapping_modes bengine::curses_window::default_wrapping_mode = bengine::curses_window::wrapping_modes::BASIC;
     const std::unordered_map<unsigned char, wchar_t> bengine::curses_window::box_drawing_key = {
         {5, L'┌'}, {6, L'┎'}, {7, L'╓'}, {9, L'┍'},
         {10, L'┏'}, {13, L'╒'}, {15, L'╔'}, {17, L'┐'}, {18, L'┒'}, {19, L'╖'},
