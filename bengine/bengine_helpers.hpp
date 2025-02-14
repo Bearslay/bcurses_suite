@@ -712,22 +712,375 @@ namespace bengine {
     // \brief A class containing useful functions that make converting from arithmetic data types to strings with various formatting additions easy as well as converting strings to numbers
     class string_helper {
         public:
+            struct number_formats {
+                unsigned int min_width = 0;
+                unsigned int max_width = 0;
+                unsigned char format_args = 0;
+                char fill_character = '0';
+            };
+
+            enum class notations : unsigned char {
+                BASIC = 0,
+                SCIENTIFIC = 1,
+                ENGINEERING = 2,
+            };
+
+            enum class bases : unsigned char {
+                BINARY = 2,
+                OCTAL = 8,
+                DECIMAL = 10,
+                HEXADECIMAL = 16
+            };
+
+        private:
+            static bengine::string_helper::notations default_number_notion;
+            static bengine::string_helper::bases default_number_base;
+            static bool default_sign_display_state;
+            static bool default_representation_preference_state;
+            static bengine::string_helper::number_formats default_number_formats;
+            static unsigned char precision_break;
+
+        public:
+            /** Convert number to scientific notation, changing the value itself and an exponent value
+             * 
+             * Integer types will only have the exponent changed; any operations on the number to make its value what it should be will have to happen externally
+             * 
+             * \tparam type Arithmetic type
+             * \param number Number to be changed
+             * \param exponent Exponent to be calculated (having this be non-zero upon input is ok too)
+             * \param base The base used in order to find the threshold for number (decimal = 10, octal = 8, etc)
+             * \returns Nothing, but the sources for `number` and `exponent` will have changed
+             */
+            template <class type> static void scientific_notation(type &number, short &exponent, const bengine::string_helper::bases &base = bengine::string_helper::bases::DECIMAL) {
+                static_assert(std::is_arithmetic<type>::value, "type must be an arithmetic type");
+                // Nothing needs to happen if the number is zero
+                if (number == 0) {
+                    return;
+                }
+
+                short threshold = 0;
+                switch (base) {
+                    default:
+                    case bengine::string_helper::bases::DECIMAL:
+                        threshold = 10;
+                        break;
+                    case bengine::string_helper::bases::BINARY:
+                        threshold = 2;
+                        break;
+                    case bengine::string_helper::bases::OCTAL:
+                        threshold = 8;
+                        break;
+                    case bengine::string_helper::bases::HEXADECIMAL:
+                        threshold = 16;
+                        break;
+                }
+
+                // If the type is integral, then actual scientific notation can't happen so only the required exponent for division is calculated
+                if (std::is_integral<type>::value) {
+                    double num = std::fabs(number);
+                    while (num > threshold) {
+                        num /= threshold;
+                        exponent++;
+                    }
+                    // do not need to do the reverse loop where num < 1 b/c an integer number will never be less than 1 but not zero
+                    return;
+                }
+
+                const bool negative_input = number < 0;
+                number = std::fabs(number);
+                while (number > threshold) {
+                    number /= threshold;
+                    exponent++;
+                }
+                while (number < 1) {
+                    number *= threshold;
+                    exponent--;
+                }
+                if (negative_input) {
+                    number = -number;
+                }
+            }
+
+            /** Convert number to engineering notation (exponent is a multiple of 3 or -3), changing the value itself and an exponent value
+             * 
+             * Integer types will only have the exponent changed unless the input exponent isn't a multiple of 3/-3 in which case it is increased; any operations on the number to make its value what it should be will have to happen externally
+             * 
+             * \tparam type Arithmetic type
+             * \param number Number to be changed
+             * \param exponent Exponent to be calculated (having this be non-zero upon input is ok too)
+             * \param base The base used in order to find the threshold for number (decimal = 10, octal = 8, etc)
+             * \returns Nothing, but the sources for `number` and `exponent` will have changed
+             */
+            template <class type> static void engineering_notation(type &number, short &exponent, const bengine::string_helper::bases &base = bengine::string_helper::bases::DECIMAL) {
+                static_assert(std::is_arithmetic<type>::value, "type must be an arithmetic type");
+                // Nothing needs to happen if the number is zero
+                if (number == 0) {
+                    return;
+                }
+
+                short threshold = 0;
+                switch (base) {
+                    default:
+                    case bengine::string_helper::bases::DECIMAL:
+                        threshold = 1000;
+                        break;
+                    case bengine::string_helper::bases::BINARY:
+                        threshold = 8;
+                        break;
+                    case bengine::string_helper::bases::OCTAL:
+                        threshold = 512;
+                        break;
+                    case bengine::string_helper::bases::HEXADECIMAL:
+                        threshold = 4096;
+                        break;
+                }
+
+                // Modify the inputs so that the exponent is a multiple of 3/-3 before doing the main adjustment
+                if (exponent > 0) {
+                    const short mod = exponent % 3;
+                    if (mod != 0) {
+                        number *= std::pow(10, mod);
+                        exponent -= mod;
+                    }
+                } else if (exponent < 0) {
+                    exponent = -exponent;
+                    const short mod = exponent % 3;
+                    if (mod != 0) {
+                        number *= std::pow(10, 3 - mod);
+                        exponent += 3 - mod;
+                    }
+                    exponent = -exponent;
+                }
+
+                // If the type is integral, then actual engineering notation can't happen so only the required exponent for division is calculated
+                if (std::is_integral<type>::value) {
+                    double num = std::fabs(number);
+                    while (num > threshold) {
+                        num /= threshold;
+                        exponent += 3;
+                    }
+                    // do not need to do the reverse loop where num < 1 b/c an integer number will never be less than 1 but not zero
+                    return;
+                }
+
+                const bool negative_input = number < 0;
+                number = std::fabs(number);
+                while (number > threshold) {
+                    number /= threshold;
+                    exponent += 3;
+                }
+                while (number < 1) {
+                    number *= threshold;
+                    exponent -= 3;
+                }
+                if (negative_input) {
+                    number = -number;
+                }
+            }
+
+            template <class type> static std::string to_string(const type &input) {
+                static_assert(std::is_arithmetic<type>::value, "type must be an arithmetic type");
+
+                if (std::is_integral<type>::value) {
+                    return std::to_string(input);
+                }
+                std::string output = std::to_string(input);
+                while (output.back() == '0') {
+                    output.pop_back();
+                    if (output.back() == '.') {
+                        output.pop_back();
+                        break;
+                    }
+                }
+                return output;
+            }
+
+            /** Number formatting:
+             * Amount of leading zeros or spaces
+             * Amount of trailing zeros (only for decimal numbers)
+             * Whether to use scientific notation or not
+             * Whether to use engineering notation or not
+             * Whether to specifc sign or not
+             * Whether to be uppercase or not (in case of scientific/engineering notation or hexadecimal)
+             * Whether to show 10^x or 16^x or etc in the case of scientific/engineering notation
+             * Express value in binary, octal, decimal, or hexadecimal
+             * Use shorter representation (between normal or scientific, engineering will always be longer or the same length as scientific)    (use base-power or E, uppercase, notation, base, sign, shortest length) 0 0 01 11 0 0 
+             */
+            static unsigned char make_number_formatting_arguments(const bengine::string_helper::notations &notation, const bengine::string_helper::bases &base, const bool &always_show_sign, const bool &use_shortest_representation, const bool &use_exponent_abbreviation, const bool &use_uppercase) {
+                return (static_cast<unsigned char>(use_exponent_abbreviation) << 7) + (static_cast<unsigned char>(use_uppercase) << 6) + (static_cast<unsigned char>(notation) << 4) + (static_cast<unsigned char>(base) << 2) + (always_show_sign << 1) + use_shortest_representation;
+            }
+
+            template <class type> static std::string decimal_to_binary(const type &input) {
+                static_assert(std::is_arithmetic<type>::value, "type must be an arithmetic type");
+                
+                std::string output = "";
+                type num = std::fabs(input);
+                while (std::floor(num) > 0) {
+                    output = static_cast<char>(48 + std::fmod(num, 2)) + output;
+                    num /= 2;
+                }
+
+                if (std::is_integral<type>::value || input == std::floor(input)) {
+                    return input < 0 ? ('-' + output) : output;
+                }
+                output += '.';
+
+                num = std::fabs(input) - std::floor(std::fabs(input));    // Original input is required here, otherwise could const reference from input parameter
+                for (unsigned char precision = 0; precision < bengine::string_helper::precision_break; precision++) {
+                    num *= 2;
+                    if (num >= 1) {
+                        output += '1';
+                        num -= 1;
+                    } else if (num > 0) {
+                        output += '0';
+                    } else {
+                        break;
+                    }
+                }
+
+                return input < 0 ? ('-' + output) : output;
+            }
+
+            template <class type> static std::string decimal_to_octal(const type &input) {
+                static_assert(std::is_arithmetic<type>::value, "type must be an arithmetic type");
+                
+                std::string output = "";
+                type num = std::fabs(input);
+                while (std::floor(num) > 0) {
+                    output = static_cast<char>(48 + std::fmod(num, 8)) + output;
+                    num /= 8;
+                }
+
+                if (std::is_integral<type>::value || input == std::floor(input)) {
+                    return input < 0 ? ('-' + output) : output;
+                }
+                output += '.';
+
+                num = std::fabs(input) - std::floor(std::fabs(input));    // Original input is required here, otherwise could const reference from input parameter
+                for (unsigned char precision = 0; precision < bengine::string_helper::precision_break; precision++) {
+                    num *= 8;
+                    if (num <= 0) {
+                        break;
+                    } else {
+                        const int mod = static_cast<int>(std::fmod(num, 8));
+                        output += static_cast<char>(48 + mod);
+                        num -= mod;
+                    }
+                }
+
+                return input < 0 ? ('-' + output) : output;
+            }
+
+            template <class type> static std::string decimal_to_decimal(const type &input, const bengine::string_helper::notations &notation, const bool &always_show_sign, const bool &use_shortest_representation, const bool &use_exponent_abbreviation, const bool &use_uppercase) {
+                static_assert(std::is_arithmetic<type>::value, "type must be an arithmetic type");
+
+                // It's honestly easier to deal with zero right away since no amount of formatting changes the output and it causes issues in a few spots
+                if (input == 0) {
+                    return "0";
+                }
+
+                // Finding scientific/engineering notation not required; only needs a very basic to_string function that removes trailing zeros
+                if (notation == bengine::string_helper::notations::BASIC && !use_shortest_representation) {
+                    return (always_show_sign && input > 0 ? "+" : "") + bengine::string_helper::to_string(input);
+                }
+
+                double num = std::fabs(static_cast<double>(input));
+                short exponent = 0;
+
+                // Generate the values used for either scientific or engineering notation
+                if (notation == bengine::string_helper::notations::SCIENTIFIC) {
+                    bengine::string_helper::scientific_notation(num, exponent, bengine::string_helper::bases::DECIMAL);
+                } else {
+                    bengine::string_helper::engineering_notation(num, exponent, bengine::string_helper::bases::DECIMAL);
+                }
+                // If the exponent remains zero then nothing else needs to happen, just return basic notation
+                if (exponent == 0) {
+                    return (always_show_sign && input > 0 ? "+" : "") + bengine::string_helper::to_string(input);
+                }
+
+                // Comparing the length of each representation is not required; only scientific/engineering notation can be outputted
+                if (!use_shortest_representation) {
+                    if (always_show_sign) {
+                        return (input > 0 ? "+" : "") + bengine::string_helper::to_string(num) + (use_exponent_abbreviation ? (use_uppercase ? "E" : "e") : "x10^") + (exponent > 0 ? "+" : "") + std::to_string(exponent);
+                    }
+                    return (input < 0 ? "-" : "") + bengine::string_helper::to_string(num) + (use_exponent_abbreviation ? (use_uppercase ? "E" : "e") : "x10^") + std::to_string(exponent);
+                }
+
+                std::string basic_output, exponated_output;
+                if (always_show_sign && input > 0) {
+                    basic_output = '+' + bengine::string_helper::to_string(input);
+                    exponated_output = '+' + bengine::string_helper::to_string(num) + (use_exponent_abbreviation ? (use_uppercase ? "E" : "e") : "x10^") + (always_show_sign && exponent > 0 ? "+" : "") + std::to_string(exponent);
+                } else {
+                    basic_output = bengine::string_helper::to_string(input);
+                    exponated_output = (input < 0 ? "-" : "") + bengine::string_helper::to_string(num) + (use_exponent_abbreviation ? (use_uppercase ? "E" : "e") : "x10^") + std::to_string(exponent);
+                }
+                return basic_output.length() <= exponated_output.length() ? basic_output : exponated_output;
+            }
+
+            template <class type> static std::string decimal_to_hexadecimal(const type &input, const bool &use_uppercase = true) {
+                static_assert(std::is_arithmetic<type>::value, "type must be an arithmetic type");
+                
+                std::string output = "";
+                type num = std::fabs(input);
+                while (std::floor(num) > 0) {
+                    const int mod = std::fmod(num, 16);
+                    output = static_cast<char>(mod < 10 ? 48 + mod : ((use_uppercase ? 55 : 87) + mod)) + output;
+                    num /= 16;
+                }
+
+                if (std::is_integral<type>::value || input == std::floor(input)) {
+                    return input < 0 ? ('-' + output) : output;
+                }
+                output += '.';
+
+                num = std::fabs(input) - std::floor(std::fabs(input));    // Original input is required here, otherwise could const reference from input parameter
+                for (unsigned char precision = 0; precision < bengine::string_helper::precision_break; precision++) {
+                    num *= 16;
+                    if (num <= 0) {
+                        break;
+                    } else {
+                        const int mod = static_cast<int>(std::fmod(num, 16));
+                        output += static_cast<char>(mod < 10 ? 48 + mod : ((use_uppercase ? 55 : 87) + mod));
+                        num -= mod;
+                    }
+                }
+
+                return input < 0 ? ('-' + output) : output;
+            }
+
             // \brief bengine::string_helper constructor
             string_helper() {}
             // \brief bengine::string_helper deconstructor
             ~string_helper() {}
 
+            // template <class type> static std::string to_string(const type &input, const bengine::string_helper::number_formats &formatting) {
+            //     static_assert(std::is_arithmetic<type>::value, "type must be an arithmetic type");
+
+            //     const unsigned char notation = bengine::bitwise_manipulator::get_subvalue(formatting.format_args, 4, 2);
+            //     const unsigned char base = bengine::bitwise_manipulator::get_subvalue(formatting.format_args, 2, 2);
+            //     const bool always_show_sign = bengine::bitwise_manipulator::check_for_activated_bits(formatting.format_args, 2);
+            //     const bool use_shortest_representation = bengine::bitwise_manipulator::check_for_activated_bits(formatting.format_args, 1);
+
+            //     if (notation == bengine::string_helper::notations::BASIC) {
+            //         if (base == bengine::string_helper::bases::DECIMAL) {
+            //             std::string output = std::to_string(input);
+                        
+            //         }
+            //     }
+            // }
+
             /** Convert an arithmetic data type to an std::string; trailing zeros and decimals are omitted from floating-point conversions
              * \tparam type An arithmetic data type to convert from
              * \param input The arithmetic value to convert into a string
+             * \param always_include_sign Whether to include a positive sign if the input is positive or not (a negative sign will be included regardless of the value of this parameter)
              * \returns An std::string where each character represents a part of the input; trailing zeros and decimals are omitted from floating-point conversions
              */
-            template <class type> static std::string to_string(const type &input) {
+            template <class type> static std::string to_string(const type &input, const bool always_include_sign) {
                 static_assert(std::is_arithmetic<type>::value, "type must be an arithmetic type");
 
                 // std::to_string() is acceptable for anything other than floating-point types
                 if (std::is_integral<type>::value) {
-                    return std::to_string(input);
+                    return (always_include_sign && input >= 0 ? "+" : "") + std::to_string(input);
                 }
 
                 std::string output = std::to_string(input);
@@ -740,18 +1093,7 @@ namespace bengine {
                         break;
                     }
                 }
-                return output;
-            }
-
-            /** Convert an arithmetic data type to an std::string while having the ability to specify sign; trailing zeros and decimals are omitted from floating-point conversions
-             * \tparam type An arithmetic data type to convert from
-             * \param input The arithmetic value to convert into a string
-             * \param always_include_sign Whether to include a positive sign if the input is positive or not (a negative sign will be included regardless of the value of this parameter)
-             * \returns An std::string where each character represents a part of the input (and might also specifically include a sign); trailing zeros and decimals are omitted from floating-point conversions
-             */
-            template <class type> static std::string to_string(const type &input, const bool always_include_sign) {
-                static_assert(std::is_arithmetic<type>::value, "type must be an arithmetic type");
-                return (always_include_sign && input >= 0 ? "+" : "") + bengine::string_helper::to_string<type>(input);
+                return (always_include_sign && input >= 0 ? "+" : "") + output;
             }
 
             /** Convert an arithmetic data type to an std::string with extra leading/trailing zeros if specified
@@ -759,9 +1101,10 @@ namespace bengine {
              * \param input The arithmetic value to convert into a string
              * \param left_digits The minimum amount of digits that will be to the left of the decimal (can be exceeded depending on input value); reached by adding leading zeros
              * \param right_digits The minimum amount of digits that will be to the right of the decimal (can be exceeded depending on input value); reached by adding trailing zeros
+             * \param always_include_sign Whether to include a positive sign if the input is positive or not (a negative sign will be included regardless of the value of this parameter)
              * \returns An std::string where each character represents a part of the input; leading and trailing zeros are also included in order to meet certain requirements
              */
-            template <class type> static std::string to_string_with_added_zeros(const type &input, const unsigned long int &left_digits, const unsigned long int &right_digits) {
+            template <class type> static std::string to_string_with_added_zeros(const type &input, const unsigned long int &left_digits, const unsigned long int &right_digits, const bool &always_include_sign) {
                 static_assert(std::is_arithmetic<type>::value, "type must be an arithmetic type");
                 std::string output = bengine::string_helper::to_string<type>(input);
                 const unsigned long int decimal_index = output.find('.');
@@ -775,7 +1118,7 @@ namespace bengine {
                 }
                 // Return early if no trailing zeros are needed
                 if (right_digits == 0) {
-                    return output;
+                    return (always_include_sign && input >= 0 ? "+" : "") + output;
                 }
 
                 // Add a decimal place if it is missing
@@ -786,18 +1129,7 @@ namespace bengine {
                 for (unsigned long int i = right_length; i < right_digits; i++) {
                     output += '0';
                 }
-                return output;
-            }
-
-            /** Convert an arithmetic data type to an std::string with extra leading/trailing zeros if specified
-             * \tparam type An arithmetic data type to convert from
-             * \param input The arithmetic value to convert into a string
-             * \param left_digits The minimum amount of digits that will be to the left of the decimal (can be exceeded depending on input value); reached by adding leading zeros
-             * \param right_digits The minimum amount of digits that will be to the right of the decimal (can be exceeded depending on input value); reached by adding trailing zeros
-             * \returns An std::string where each character represents a part of the input; leading and trailing zeros are also included in order to meet certain parameters
-             */
-            template <class type> static std::string to_string_with_added_zeros(const type &input, const unsigned long int &left_digits, const unsigned long int &right_digits, const bool &always_include_sign) {
-                return (always_include_sign && input >= 0 ? "+" : "") + bengine::string_helper::to_string_with_added_zeros<type>(input, left_digits, right_digits);
+                return (always_include_sign && input >= 0 ? "+" : "") + output;
             }
 
             /** Convert an arithmetic data type to an std::string with a specified minimum length
@@ -805,9 +1137,10 @@ namespace bengine {
              * \param input The arithmetic value to convert into a string
              * \param length The minimum length of the output std::string (reached using leading/trailing zeros)
              * \param add_leading_zeros Whether to add leading zeros or not (trailing zeros) in order to reach the minimum length
+             * \param always_include_sign Whether to include a positive sign if the input is positive or not (sign contributes to the desired length)
              * \returns An std::string where each character represents a part of the input and also beginning with either a positive or negatie sign; leading or trailing zeros are included to reach a specified minimum string length
              */
-            template <class type> static std::string to_string_with_target_length(const type &input, const unsigned long int &length, const bool &add_leading_zeros) {
+            template <class type> static std::string to_string_with_target_length(const type &input, const unsigned long int &length, const bool &add_leading_zeros, const bool &always_include_sign) {
                 static_assert(std::is_arithmetic<type>::value, "type must be an arithmetic type");
                 std::string output = bengine::string_helper::to_string<type>(input);
 
@@ -817,7 +1150,7 @@ namespace bengine {
                     while (output.length() < length) {
                         output.insert(insert_position, "0");
                     }
-                    return output;
+                    return (always_include_sign && input >= 0 ? "+" : "") + output;
                 }
                 
                 if (output.find('.') == std::string::npos) {
@@ -833,19 +1166,7 @@ namespace bengine {
                 while (output.length() < length) {
                     output += "0";
                 }
-                return output;
-            }
-
-            /** Convert an arithmetic data type to an std::string with a specified minimum length
-             * \tparam type An arithmetic data type to convert from
-             * \param input The arithmetic value to convert into a string
-             * \param length The minimum length of the output std::string (reached using leading/trailing zeros)
-             * \param add_leading_zeros Whether to add leading zeros (true) or add trailing zeros (false) to reach the minimum length
-             * \param always_include_sign Whether to include a positive sign if the input is positive or not (sign contributes to the desired length)
-             * \returns An std::string where each character represents a part of the input; leading or trailing zeros are included to reach a specified minimum string length
-             */
-            template <class type> static std::string to_string_with_target_length(const type &input, const unsigned long int &length, const bool &add_leading_zeros, const bool &always_include_sign) {
-                return (always_include_sign && input >= 0 ? "+" : "") + bengine::string_helper::to_string_with_target_length<type>(input, length, add_leading_zeros);
+                return (always_include_sign && input >= 0 ? "+" : "") + output;
             }
 
             /** Convert an arithmetic data type to an std::u16string making use of the bengine::string_helper::to_string() function
@@ -876,6 +1197,13 @@ namespace bengine {
                 return {str.begin(), str.end()};
             }
     };
+    bengine::string_helper::notations bengine::string_helper::default_number_notion = bengine::string_helper::notations::BASIC;
+    bengine::string_helper::bases bengine::string_helper::default_number_base = bengine::string_helper::bases::DECIMAL;
+    bool bengine::string_helper::default_sign_display_state = false;
+    bool bengine::string_helper::default_representation_preference_state = false;
+    bengine::string_helper::number_formats default_number_formats = {0, 0, 0};
+    unsigned char bengine::string_helper::precision_break = 16;
+
     /** Convert an std::string to an std::u16string
      * \param input The std::string to convert from
      * \returns An std::u16string derived from the inputted std::string
