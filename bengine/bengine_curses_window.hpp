@@ -10,14 +10,17 @@
 namespace bengine {
     class curses_window {
         private:
-            static const std::unordered_map<unsigned char, wchar_t> box_drawing_key;
-            static const std::unordered_map<char, std::vector<std::wstring>> matrix_text_key;
+            static const std::vector<unsigned char> box_drawing_key;
+            static const std::wstring box_drawing_chars;
+            static const std::vector<std::wstring> matrix_text_key;
 
-            static wchar_t default_cell_character;
             static unsigned char default_cell_color_pair;
             static unsigned short default_cell_attributes;
+            static unsigned short default_wrapping_width;
+            static unsigned char default_wrapping_mode;
+
+            static wchar_t default_cell_character;
             static unsigned short default_box_drawing_style;
-            static bengine::curses_window::wrapping_modes default_wrapping_mode;
 
         public:
             // \brief A number representing one of the first 16 color pairs initialized upon startup (names assume that nothing was changed)
@@ -58,10 +61,10 @@ namespace bengine {
                 SINGLE_DASH_2 = 8192        // the second variation of a line with 1 large gap using half of the character
             };
 
-            enum class wrapping_modes : unsigned char {
-                NONE = 1,       // do not wrap at all
-                BASIC = 2,      // wrap to the left edge of a window (where x = 0)
-                INDENTED = 3    // wrap to the x-position that the string/int/whatever originated at
+            enum wrapping_modes : unsigned char {
+                NONE = 0,       // do not wrap at all
+                BASIC = 1,      // wrap to the left edge of a window (where x = 0)
+                INDENTED = 2    // wrap to the x-position that the string/int/whatever originated at
             };
 
             // \brief Different attributes of a cell supported by ncurses or bengine
@@ -89,7 +92,54 @@ namespace bengine {
                 unsigned short attributes = bengine::curses_window::default_cell_attributes;
             };
 
+            enum write_arg_options : unsigned char {
+                COLOR = 1,
+                ATTRIBUTES = 2,
+                WRAPPING_WIDTH = 4,
+                WRAPPING_MODE = 8
+            };
+
+            struct write_args {
+                unsigned char color_pair = bengine::curses_window::default_cell_color_pair;
+                unsigned short attributes = bengine::curses_window::default_cell_attributes;
+                unsigned short wrapping_width = bengine::curses_window::default_wrapping_width;
+                unsigned char wrapping_mode = bengine::curses_window::default_wrapping_mode;
+            };
+
+            static bengine::curses_window::write_args make_write_args(const unsigned char &write_args, const std::vector<unsigned short> &args) {
+                if (args.size() < 1) {
+                    return bengine::curses_window::default_write_args;
+                }
+                bengine::curses_window::write_args output = bengine::curses_window::default_write_args;
+
+                unsigned char index = 0;
+                if (bengine::bitwise_manipulator::check_for_activated_bits(write_args, static_cast<unsigned char>(bengine::curses_window::write_arg_options::COLOR))) {
+                    output.color_pair = static_cast<unsigned char>(args.at(index++));
+                    if (index >= args.size()) {
+                        return output;
+                    }
+                }
+                if (bengine::bitwise_manipulator::check_for_activated_bits(write_args, static_cast<unsigned char>(bengine::curses_window::write_arg_options::ATTRIBUTES))) {
+                    output.attributes = args.at(index++);
+                    if (index >= args.size()) {
+                        return output;
+                    }
+                }
+                if (bengine::bitwise_manipulator::check_for_activated_bits(write_args, static_cast<unsigned char>(bengine::curses_window::write_arg_options::WRAPPING_WIDTH))) {
+                    output.wrapping_width = args.at(index++);
+                    if (index >= args.size()) {
+                        return output;
+                    }
+                }
+                if (bengine::bitwise_manipulator::check_for_activated_bits(write_args, static_cast<unsigned char>(bengine::curses_window::write_arg_options::WRAPPING_MODE))) {
+                    output.wrapping_mode = static_cast<unsigned char>(args.at(index));
+                }
+                return output;
+            }
+
         private:
+            static bengine::curses_window::write_args default_write_args;
+
             // \brief x-position (col) of the top-left corner of the window
             int x_pos = 0;
             // \brief y-position (row) of the top-left corner of the window
@@ -406,17 +456,17 @@ namespace bengine {
             }
 
             // write character to window and return the position of where the cursor would be after writing the character (x + 1 unless wrapping)
-            std::pair<unsigned short, unsigned short> write_character(const unsigned short &x, const unsigned short &y, const wchar_t &character, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes, const bengine::curses_window::wrapping_modes &wrapping_mode = bengine::curses_window::default_wrapping_mode) {
+            std::pair<unsigned short, unsigned short> write_character(const unsigned short &x, const unsigned short &y, const wchar_t &character, const bengine::curses_window::write_args &args = bengine::curses_window::default_write_args) {
                 if (!this->check_coordinate_bounds(x, y)) {
                     return std::make_pair(x, y);
                 }
 
                 this->grid.at(y).at(x).character = character;
-                this->grid.at(y).at(x).color_pair = color;
-                this->grid.at(y).at(x).attributes = attributes;
+                this->grid.at(y).at(x).color_pair = args.color_pair;
+                this->grid.at(y).at(x).attributes = args.attributes;
 
                 if (x >= this->get_width() - 1) {
-                    switch (wrapping_mode) {
+                    switch (args.wrapping_mode) {
                         case bengine::curses_window::wrapping_modes::NONE:
                             return std::make_pair(x + 1, y);
                         default:
@@ -428,23 +478,24 @@ namespace bengine {
                 }
                 return std::make_pair(x + 1, y);
             }
-            std::pair<unsigned short, unsigned short> write_character(const std::pair<unsigned short, unsigned short> &pos, const wchar_t &character, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes, const bengine::curses_window::wrapping_modes &wrapping_mode = bengine::curses_window::default_wrapping_mode) {
-                return this->write_character(pos.first, pos.second, character, color, attributes, wrapping_mode);
+            std::pair<unsigned short, unsigned short> write_character(const std::pair<unsigned short, unsigned short> &pos, const wchar_t &character, const bengine::curses_window::write_args &args = bengine::curses_window::default_write_args) {
+                return this->write_character(pos.first, pos.second, character, args);
             }
 
-            std::pair<unsigned short, unsigned short> write_string(const unsigned short &x, const unsigned short &y, const std::wstring &string, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes, const bengine::curses_window::wrapping_modes &wrapping_mode = bengine::curses_window::default_wrapping_mode) {
+            std::pair<unsigned short, unsigned short> write_string(const unsigned short &x, const unsigned short &y, const std::wstring &string, const bengine::curses_window::write_args &args = bengine::curses_window::default_write_args) {
                 if (!this->check_coordinate_bounds(x, y)) {
                     return std::make_pair(x, y);
                 }
 
                 std::pair<unsigned short, unsigned short> pos = std::make_pair(x, y);
+                unsigned short line_count = 1;    // keeps track of the amount of characters written for each line, if the wrapping width is reached before the edge of the window then the function should newline anyways
                 for (std::size_t i = 0; i < string.length(); i++) {
                     this->grid.at(pos.second).at(pos.first).character = string.at(i);
-                    this->grid.at(pos.second).at(pos.first).color_pair = color;
-                    this->grid.at(pos.second).at(pos.first).attributes = attributes;
+                    this->grid.at(pos.second).at(pos.first).color_pair = args.color_pair;
+                    this->grid.at(pos.second).at(pos.first).attributes = args.attributes;
 
-                    if (pos.first >= this->get_width() - 1) {
-                        switch (wrapping_mode) {
+                    if (pos.first >= this->get_width() - 1 || (args.wrapping_width > 0 && line_count >= args.wrapping_width)) {
+                        switch (args.wrapping_mode) {
                             case bengine::curses_window::wrapping_modes::NONE:
                                 return std::make_pair(pos.first + 1, pos.second);
                             default:
@@ -459,15 +510,24 @@ namespace bengine {
                         if (pos.second >= this->get_height() - 1) {
                             break;
                         }
+                        line_count = 1;
                     } else {
+                        line_count++;
                         pos.first++;
                     }
                 }
 
                 return pos;
             }
-            std::pair<unsigned short, unsigned short> write_string(const std::pair<unsigned short, unsigned short> &pos, const std::wstring &string, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes, const bengine::curses_window::wrapping_modes &wrapping_mode = bengine::curses_window::default_wrapping_mode) {
-                return this->write_string(pos.first, pos.second, string, color, attributes, wrapping_mode);
+            std::pair<unsigned short, unsigned short> write_string(const std::pair<unsigned short, unsigned short> &pos, const std::wstring &string, const bengine::curses_window::write_args &args = bengine::curses_window::default_write_args) {
+                return this->write_string(pos.first, pos.second, string, args);
+            }
+
+            template <class type> std::pair<unsigned short, unsigned short> write_number(const unsigned short &x, const unsigned short &y, const type &number, const bengine::curses_window::write_args &args = bengine::curses_window::default_write_args) {
+                return this->write_string(x, y, bengine::string_helper::to_string(number), args);
+            }
+            template <class type> std::pair<unsigned short, unsigned short> write_number(const std::pair<unsigned short, unsigned short> &pos, const type &number, const bengine::curses_window::write_args &args = bengine::curses_window::default_write_args) {
+                return this->write_string(pos.first, pos.second, bengine::string_helper::to_string(number), args);
             }
 
             void reset_all_cells() {
@@ -486,133 +546,123 @@ namespace bengine {
                     }
                 }
             }
+
+            void draw_line(const unsigned short &x, const unsigned short &y, const int &length, const bool &horiztonal = true, const unsigned short &style) {
+                // if starting coordinate is out of bounds and length is greater than 0 then the line will never enter the window
+                if (!this->check_coordinate_bounds(x, y) && length >= 0) {
+                    return;
+                }
+
+
+            }
     };
+    unsigned char bengine::curses_window::default_cell_color_pair = bengine::curses_window::preset_colors::WHITE;
+    unsigned short bengine::curses_window::default_cell_attributes = bengine::curses_window::cell_attributes::BOX_DRAWING_MERGABLE;
+    unsigned short bengine::curses_window::default_wrapping_width = 0;
+    unsigned char bengine::curses_window::default_wrapping_mode = bengine::curses_window::wrapping_modes::BASIC;
+    bengine::curses_window::write_args bengine::curses_window::default_write_args = {bengine::curses_window::default_cell_color_pair, bengine::curses_window::default_cell_attributes, bengine::curses_window::default_wrapping_width, bengine::curses_window::default_wrapping_mode};
+
     wchar_t bengine::curses_window::default_cell_character = L' ';
-    unsigned char bengine::curses_window::default_cell_color_pair = 1;
-    unsigned short bengine::curses_window::default_cell_attributes = 1024;
     unsigned short bengine::curses_window::default_box_drawing_style = bengine::curses_window::box_drawing_styles::LIGHT_SQUARE | bengine::curses_window::box_drawing_styles::NO_DASH;
-    bengine::curses_window::wrapping_modes bengine::curses_window::default_wrapping_mode = bengine::curses_window::wrapping_modes::BASIC;
-    const std::unordered_map<unsigned char, wchar_t> bengine::curses_window::box_drawing_key = {
-        {5, L'┌'}, {6, L'┎'}, {7, L'╓'}, {9, L'┍'},
-        {10, L'┏'}, {13, L'╒'}, {15, L'╔'}, {17, L'┐'}, {18, L'┒'}, {19, L'╖'},
-        {20, L'─'}, {21, L'┬'}, {22, L'┰'}, {23, L'╥'}, {24, L'╼'}, {25, L'┮'}, {26, L'┲'},
-        {33, L'┑'}, {34, L'┓'}, {36, L'╾'}, {37, L'┭'}, {38, L'┱'},
-        {40, L'━'}, {41, L'┯'}, {42, L'┳'}, {49, L'╕'},
-        {51, L'╗'},
-        {60, L'═'}, {61, L'╤'}, {63, L'╦'}, {65, L'│'}, {66, L'╽'}, {68, L'└'}, {69, L'├'},
-        {70, L'┟'}, {72, L'┕'}, {73, L'┝'}, {74, L'┢'}, {76, L'╘'}, {77, L'╞'},
-        {80, L'┘'}, {81, L'┤'}, {82, L'┧'}, {84, L'┴'}, {85, L'┼'}, {86, L'╁'}, {88, L'┶'}, {89, L'┾'},
-        {90, L'╆'}, {96, L'┙'}, {97, L'┥'}, {98, L'┪'},
-        {100, L'┵'}, {101, L'┽'}, {102, L'╅'}, {104, L'┷'}, {105, L'┿'}, {106, L'╈'},
-        {112, L'╛'}, {113, L'╡'},
-        {124, L'╧'}, {125, L'╪'}, {129, L'╿'},
-        {130, L'┃'}, {132, L'┖'}, {133, L'┞'}, {134, L'┠'}, {136, L'┗'}, {137, L'┡'}, {138, L'┣'},
-        {144, L'┚'}, {145, L'┦'},  {146, L'┨'}, {148, L'┸'}, {149, L'╀'},
-        {150, L'╂'}, {152, L'┺'}, {153, L'╄'}, {154, L'╊'},
-        {160, L'┛'}, {161, L'┩'}, {162, L'┫'}, {164, L'┹'}, {165, L'╃'}, {166, L'╉'}, {168, L'┻'}, {169, L'╇'},
-        {170, L'╋'},
-        {195, L'║'}, {196, L'╙'}, {199, L'╟'},
-        {204, L'╚'}, {207, L'╠'}, {208, L'╜'},
-        {211, L'╢'}, {212, L'╨'}, {215, L'╫'},
-        {240, L'╝'}, {243, L'╣'},
-        {252, L'╩'}, {255, L'╬'}
-    };
-    const std::unordered_map<char, std::vector<std::wstring>> bengine::curses_window::matrix_text_key = {
-        {' ', {L"         ", L"                "}},
-        {'!', {L" █  █  ▄ ", L" ▐▌  ▐▌  ▝▘  ▐▌ "}},
-        {'"', {L"▗ ▖▝ ▘   ", L"  ▖   ▘         "}},
-        {'#', {L"▟▄▙▐ ▌▜▀▛", L" ▌▐ ▀▛▜▀▄▙▟▄ ▌▐ "}},
-        {'$', {L"▗▙▖▚▙▖▗▙▞", L"  ▖ ▞▀▛▘▝▀▛▚▝▀▛▘"}},
-        {'%', {L"█ ▞ ▞ ▞ █", L"▞▚ ▞▚▞▞  ▞▞▚▞ ▚▞"}},
-        {'&', {L"▞▚ ▞▌▖▚▞▖", L"▗▀▖ ▝▄▘ ▞▝▖▐▚▄▞▚"}},
-        {'\'', {L" ▗▖  ▘   ", L" ▖▖  ▘▘         "}},
-        {'(', {L" ▞▘▐   ▚▖", L" ▗▀  ▌   ▌   ▝▄ "}},
-        {')', {L"▝▚   ▌▗▞ ", L" ▀▖   ▐   ▐  ▄▘ "}},
-        {'*', {L"▝▄▘▗▀▖   ", L" ▚▙▘ ▘▘▘        "}},
-        {'+', {L"   ▝▀▘▝▀▘", L"  ▖ ▗▄▙▖  ▌     "}},
-        {',', {L"       ▜ ", L"             ▝▌ "}},
-        {'-', {L"   ▗▄▖   ", L"    ▗▄▄▖        "}},
-        {'.', {L"       ▄ ", L"             ▐▌ "}},
-        {'/', {L"  ▞ ▞ ▞  ", L"▞▀▀▚  ▗▞ ▐▌  ▗▖ "}},
-        {'0', {L"▞▀▙▌▞▐▜▄▞", L"▞▀▀▙▌ ▞▐▌▞ ▐▜▄▄▞"}},
-        {'1', {L" ▟  ▐  ▟▖", L" ▞▌   ▌   ▌  ▄▙▖"}},
-        {'2', {L"▞▀▚ ▗▞▟▙▄", L"▞▀▀▚   ▞ ▄▀ ▟▄▄▄"}},
-        {'3', {L"▞▀▚ ▀▚▚▄▞", L"▞▀▀▚ ▄▄▞   ▐▚▄▄▞"}},
-        {'4', {L"▌ ▌▝▀▛  ▌", L"▌  ▌▙▄▄▙   ▌   ▌"}},
-        {'5', {L"▛▀▀▀▀▚▚▄▞", L"▛▀▀▀▚▄▄▖   ▐▚▄▄▞"}},
-        {'6', {L"▞▀▀▛▀▚▚▄▞", L"▞▀▀▀▙▄▄▖▌  ▐▚▄▄▞"}},
-        {'7', {L"▀▀▜ ▗▘ ▌ ", L"▀▀▀▜ ▄▄▙  ▌  ▐  "}},
-        {'8', {L"▞▀▚▞▀▚▚▄▞", L"▞▀▀▚▚▄▄▞▌  ▐▚▄▄▞"}},
-        {'9', {L"▞▀▚▚▄▟▗▄▟", L"▞▀▀▚▚▄▄▟   ▐▗▄▄▟"}},
-        {':', {L"    ▀  ▄ ", L"     ▗▖  ▝▘  ▐▌ "}},
-        {';', {L"    ▀  ▜ ", L"     ▗▖  ▝▘  ▝▌ "}},
-        {'<', {L" ▗▖▐▌  ▝▘", L"  ▄▖▗▀  ▝▄    ▀▘"}},
-        {'=', {L"   ▄█▄ ▀ ", L"    ▗▄▄▖▗▄▄▖    "}},
-        {'>', {L"▗▖  ▐▌▝▘ ", L"▗▄    ▀▖  ▄▘▝▀  "}},
-        {'?', {L"▞▀▚ ▄▘ ▄ ", L"   ▞  ▞  ▞  ▞   "}},
-        {'@', {L"▞▀▚▌█▟▚▄▄", L"▞▀▀▚▌▞▚▐▌▚▟▟▚▄▄▄"}},
-        {'A', {L"▞▀▚▙▄▟▌ ▐", L"▞▀▀▚▌  ▐▛▀▀▜▌  ▐"}},
-        {'B', {L"▛▀▚▛▀▚▙▄▞", L"▛▀▀▚▙▄▄▞▌  ▐▙▄▄▞"}},
-        {'C', {L"▞▀▚▌  ▚▄▞", L"▞▀▀▚▌   ▌   ▚▄▄▞"}},
-        {'D', {L"▛▀▚▌ ▐▙▄▞", L"▛▀▀▚▌  ▐▌  ▐▙▄▄▞"}},
-        {'E', {L"▛▀▀▛▀▀▙▄▄", L"▛▀▀▀▙▄▄▄▌   ▙▄▄▄"}},
-        {'F', {L"▛▀▀▛▀▀▌  ", L"▛▀▀▀▙▄▄▄▌   ▌   "}},
-        {'G', {L"▞▀▚▌ ▄▚▄▟", L"▞▀▀▚▌   ▌ ▀▜▚▄▄▜"}},
-        {'H', {L"▌ ▐▛▀▜▌ ▐", L"▌  ▐▙▄▄▟▌  ▐▌  ▐"}},
-        {'I', {L"▀▜▀ ▐ ▄▟▄", L"▀▀▛▀  ▌   ▌ ▄▄▙▄"}},
-        {'J', {L"▀▜▀ ▐ ▚▟ ", L"▀▀▛▀  ▌   ▌ ▚▄▘ "}},
-        {'K', {L"▌ ▞▛▀▖▌ ▐", L"▌  ▐▙▄▞▘▌ ▝▚▌  ▐"}},
-        {'L', {L"▌  ▌  ▙▄▄", L"▌   ▌   ▌   ▙▄▄▄"}},
-        {'M', {L"▙ ▟▌▀▐▌ ▐", L"▙  ▟▌▚▞▐▌  ▐▌  ▐"}},
-        {'N', {L"▙ ▐▌▚▐▌ ▜", L"▙  ▐▌▚ ▐▌ ▚▐▌  ▜"}},
-        {'O', {L"▞▀▚▌ ▐▚▄▞", L"▞▀▀▚▌  ▐▌  ▐▚▄▄▞"}},
-        {'P', {L"▛▀▚▙▄▞▌  ", L"▛▀▀▚▙▄▄▞▌   ▌   "}},
-        {'Q', {L"▞▀▚▌▗▐▚▄▚", L"▞▀▀▚▌  ▐▌ ▚▐▚▄▄▚"}},
-        {'R', {L"▛▀▚▙▄▞▌ ▐", L"▛▀▀▚▙▄▄▞▌  ▚▌  ▐"}},
-        {'S', {L"▞▀▘▝▀▚▚▄▞", L"▞▀▀▚▚▄    ▀▚▚▄▄▞"}},
-        {'T', {L"▀▜▀ ▐  ▐ ", L"▀▀▛▀  ▌   ▌   ▌ "}},
-        {'U', {L"▌ ▐▌ ▐▚▄▞", L"▌  ▐▌  ▐▌  ▐▚▄▄▞"}},
-        {'V', {L"▌ ▐▚ ▞▝▄▘", L"▌  ▐▌  ▐▚  ▞ ▚▞ "}},
-        {'W', {L"▌ ▐▌▄▐▛ ▜", L"▌  ▐▌  ▐▌▞▚▐▛  ▜"}},
-        {'X', {L"▚ ▞ █ ▞ ▚", L"▚  ▞ ▚▞  ▞▚ ▞  ▚"}},
-        {'Y', {L"▌ ▐▝▄▘ █ ", L"▌  ▐▝▖▗▘ ▝▌   ▌ "}},
-        {'Z', {L"▀▀▜▗▞▘▙▄▄", L"▀▀▀▜  ▄▘▗▀  ▙▄▄▄"}},
-        {'[', {L"▐▀▘▐  ▐▄▖", L" ▛▀  ▌   ▌   ▙▄ "}},
-        {'\\', {L" █  █  █ ", L"▚    ▚    ▚    ▚"}},
-        {']', {L"▝▀▌  ▌▗▄▌", L" ▀▜   ▐   ▐  ▄▟ "}},
-        {'^', {L" ▄ ▝ ▘   ", L" ▗▖  ▘▝         "}},
-        {'_', {L"      ▄▄▄", L"            ▄▄▄▄"}},
-        {'`', {L"▗   ▘    ", L" ▗    ▘         "}},
-        {'a', {L"   ▞▀▟▚▄▜", L"▗▄▄▖▗▄▄▐▌  █▚▄▄▜"}},
-        {'b', {L"▌  ▙▀▚▛▄▞", L"▌   ▌▄▄▖█  ▐▛▄▄▞"}},
-        {'c', {L"   ▞▀▀▚▄▄", L"    ▗▄▄▄▌   ▚▄▄▄"}},
-        {'d', {L"  ▐▞▀▟▚▄▜", L"   ▐▗▄▄▐▌  █▚▄▄▜"}},
-        {'e', {L"   ▟█▙▚▄▄", L"    ▗▄▄▖▙▄▄▟▚▄▄▄"}},
-        {'f', {L" ▞▖▗▙▖ ▌ ", L"  ▞▖ ▄▙▖  ▌   ▚ "}},
-        {'g', {L"▞▀▟▚▄▜▗▄▞", L"▗▄▄▗▌  █▚▄▄▜▗▄▄▞"}},
-        {'h', {L"▌  ▙▀▚▌ ▐", L"▌   ▌▄▄▖█  ▐▌  ▐"}},
-        {'i', {L" ▘  ▌  ▚ ", L"  ▖   ▖   ▌   ▚ "}},
-        {'j', {L" ▝  ▐ ▝▞ ", L"  ▖   ▖   ▌  ▚▘ "}},
-        {'k', {L"▌  ▙▄▘▌ ▌", L"▌   ▌  ▗▙▄▄▘▌  ▚"}},
-        {'l', {L" ▌  ▌  ▚ ", L"  ▌   ▌   ▌   ▚ "}},
-        {'m', {L"   ▛▞▖▌▌▌", L"    ▖▄▗▖▛ ▌▐▌ ▌▐"}},
-        {'n', {L"   ▛▀▚▌ ▐", L"    ▖▄▄▖▛  ▐▌  ▐"}},
-        {'o', {L"   ▞▀▚▚▄▞", L"    ▗▄▄▖▌  ▐▚▄▄▞"}},
-        {'p', {L"▞▀▚▙▄▞▌  ", L"▖▄▄▖█  ▐▛▄▄▞▌   "}},
-        {'q', {L"▞▀▚▚▄▟  ▐", L"▗▄▄▗▌  █▚▄▄▜   ▐"}},
-        {'r', {L"   ▙▀▚▌  ", L"    ▖▄▄▖▛  ▝▌   "}},
-        {'s', {L"▗▄▖▚▄▖▗▄▞", L"    ▗▄▄▖▚▄▄▖▗▄▄▞"}},
-        {'t', {L" ▌ ▀▛▀ ▚ ", L"  ▌  ▄▙▖  ▌   ▚ "}},
-        {'u', {L"   ▌ ▐▚▄▟", L"    ▖  ▗▌  ▐▝▄▄▜"}},
-        {'v', {L"   ▌ ▐▝▄▘", L"    ▖  ▗▚  ▞ ▚▞ "}},
-        {'w', {L"   ▐▐▐▝▞▟", L"    ▖▗ ▗▌▐ ▐▚▞▄▜"}},
-        {'x', {L"   ▝▄▘▗▀▖", L"    ▗  ▖ ▚▞ ▗▘▝▖"}},
-        {'y', {L"▌ ▐▚▄▟▗▄▞", L"▖  ▗▌  ▐▝▄▄▌▗▄▄▘"}},
-        {'z', {L"▄▄▄▗▄▞▙▄▄", L"    ▄▄▄▄ ▄▄▘▟▄▄▄"}},
-        {'{', {L" ▛▘█   ▙▖", L" ▛▀ ▗▘  ▝▖   ▙▄ "}},
-        {'|', {L"▚   ▚   ▚", L" ▐▌  ▐▌  ▐▌  ▐▌ "}},
-        {'}', {L"▝▜   █▗▟ ", L" ▀▜   ▝▖  ▗▘ ▄▟ "}},
-        {'~', {L"▗▖▗▘▝▘   ", L" ▄ ▖▝ ▀         "}}
+
+    const std::vector<unsigned char> bengine::curses_window::box_drawing_key = {5, 6, 7, 9, 10, 13, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 33, 34, 36, 37, 38, 40, 41, 42, 49, 51, 60, 61, 63, 65, 66, 68, 69, 70, 72, 73, 74, 76, 77, 80, 81, 82, 84, 85, 86, 88, 89, 90, 96, 97, 98, 100, 101, 102, 104, 105, 106, 112, 113, 124, 125, 129, 130, 132, 133, 134, 136, 137, 138, 144, 145, 146, 148, 149, 150, 152, 153, 154, 160, 161, 162, 164, 165, 166, 168, 169, 170, 195, 196, 199, 204, 207, 208, 211, 212, 215, 240, 243, 252, 255};
+    const std::wstring bengine::curses_window::box_drawing_chars = L"┌┎╓┍┏╒╔┐┒╖─┬┰╥╼┮┲┑┓╾┭┱━┯┳╕╗═╤╦│╽└├┟┕┝┢╘╞┘┤┧┴┼╁┶┾╆┙┥┪┵┽╅┷┿╈╛╡╧╪╿┃┖┞┠┗┡┣┚┦┨┸╀╂┺╄╊┛┩┫┹╃╉┻╇╋║╙╟╚╠╜╢╨╫╝╣╩╬";
+    const std::vector<std::wstring> bengine::curses_window::matrix_text_key = {
+        {L"         ", L"                "},
+        {L" █  █  ▄ ", L" ▐▌  ▐▌  ▝▘  ▐▌ "},
+        {L"▗ ▖▝ ▘   ", L"  ▖   ▘         "},
+        {L"▟▄▙▐ ▌▜▀▛", L" ▌▐ ▀▛▜▀▄▙▟▄ ▌▐ "},
+        {L"▗▙▖▚▙▖▗▙▞", L"  ▖ ▞▀▛▘▝▀▛▚▝▀▛▘"},
+        {L"█ ▞ ▞ ▞ █", L"▞▚ ▞▚▞▞  ▞▞▚▞ ▚▞"},
+        {L"▞▚ ▞▌▖▚▞▖", L"▗▀▖ ▝▄▘ ▞▝▖▐▚▄▞▚"},
+        {L" ▗▖  ▘   ", L" ▖▖  ▘▘         "},
+        {L" ▞▘▐   ▚▖", L" ▗▀  ▌   ▌   ▝▄ "},
+        {L"▝▚   ▌▗▞ ", L" ▀▖   ▐   ▐  ▄▘ "},
+        {L"▝▄▘▗▀▖   ", L" ▚▙▘ ▘▘▘        "},
+        {L"   ▝▀▘▝▀▘", L"  ▖ ▗▄▙▖  ▌     "},
+        {L"       ▜ ", L"             ▝▌ "},
+        {L"   ▗▄▖   ", L"    ▗▄▄▖        "},
+        {L"       ▄ ", L"             ▐▌ "},
+        {L"  ▞ ▞ ▞  ", L"▞▀▀▚  ▗▞ ▐▌  ▗▖ "},
+        {L"▞▀▙▌▞▐▜▄▞", L"▞▀▀▙▌ ▞▐▌▞ ▐▜▄▄▞"},
+        {L" ▟  ▐  ▟▖", L" ▞▌   ▌   ▌  ▄▙▖"},
+        {L"▞▀▚ ▗▞▟▙▄", L"▞▀▀▚   ▞ ▄▀ ▟▄▄▄"},
+        {L"▞▀▚ ▀▚▚▄▞", L"▞▀▀▚ ▄▄▞   ▐▚▄▄▞"},
+        {L"▌ ▌▝▀▛  ▌", L"▌  ▌▙▄▄▙   ▌   ▌"},
+        {L"▛▀▀▀▀▚▚▄▞", L"▛▀▀▀▚▄▄▖   ▐▚▄▄▞"},
+        {L"▞▀▀▛▀▚▚▄▞", L"▞▀▀▀▙▄▄▖▌  ▐▚▄▄▞"},
+        {L"▀▀▜ ▗▘ ▌ ", L"▀▀▀▜ ▄▄▙  ▌  ▐  "},
+        {L"▞▀▚▞▀▚▚▄▞", L"▞▀▀▚▚▄▄▞▌  ▐▚▄▄▞"},
+        {L"▞▀▚▚▄▟▗▄▟", L"▞▀▀▚▚▄▄▟   ▐▗▄▄▟"},
+        {L"    ▀  ▄ ", L"     ▗▖  ▝▘  ▐▌ "},
+        {L"    ▀  ▜ ", L"     ▗▖  ▝▘  ▝▌ "},
+        {L" ▗▖▐▌  ▝▘", L"  ▄▖▗▀  ▝▄    ▀▘"},
+        {L"   ▄█▄ ▀ ", L"    ▗▄▄▖▗▄▄▖    "},
+        {L"▗▖  ▐▌▝▘ ", L"▗▄    ▀▖  ▄▘▝▀  "},
+        {L"▞▀▚ ▄▘ ▄ ", L"   ▞  ▞  ▞  ▞   "},
+        {L"▞▀▚▌█▟▚▄▄", L"▞▀▀▚▌▞▚▐▌▚▟▟▚▄▄▄"},
+        {L"▞▀▚▙▄▟▌ ▐", L"▞▀▀▚▌  ▐▛▀▀▜▌  ▐"},
+        {L"▛▀▚▛▀▚▙▄▞", L"▛▀▀▚▙▄▄▞▌  ▐▙▄▄▞"},
+        {L"▞▀▚▌  ▚▄▞", L"▞▀▀▚▌   ▌   ▚▄▄▞"},
+        {L"▛▀▚▌ ▐▙▄▞", L"▛▀▀▚▌  ▐▌  ▐▙▄▄▞"},
+        {L"▛▀▀▛▀▀▙▄▄", L"▛▀▀▀▙▄▄▄▌   ▙▄▄▄"},
+        {L"▛▀▀▛▀▀▌  ", L"▛▀▀▀▙▄▄▄▌   ▌   "},
+        {L"▞▀▚▌ ▄▚▄▟", L"▞▀▀▚▌   ▌ ▀▜▚▄▄▜"},
+        {L"▌ ▐▛▀▜▌ ▐", L"▌  ▐▙▄▄▟▌  ▐▌  ▐"},
+        {L"▀▜▀ ▐ ▄▟▄", L"▀▀▛▀  ▌   ▌ ▄▄▙▄"},
+        {L"▀▜▀ ▐ ▚▟ ", L"▀▀▛▀  ▌   ▌ ▚▄▘ "},
+        {L"▌ ▞▛▀▖▌ ▐", L"▌  ▐▙▄▞▘▌ ▝▚▌  ▐"},
+        {L"▌  ▌  ▙▄▄", L"▌   ▌   ▌   ▙▄▄▄"},
+        {L"▙ ▟▌▀▐▌ ▐", L"▙  ▟▌▚▞▐▌  ▐▌  ▐"},
+        {L"▙ ▐▌▚▐▌ ▜", L"▙  ▐▌▚ ▐▌ ▚▐▌  ▜"},
+        {L"▞▀▚▌ ▐▚▄▞", L"▞▀▀▚▌  ▐▌  ▐▚▄▄▞"},
+        {L"▛▀▚▙▄▞▌  ", L"▛▀▀▚▙▄▄▞▌   ▌   "},
+        {L"▞▀▚▌▗▐▚▄▚", L"▞▀▀▚▌  ▐▌ ▚▐▚▄▄▚"},
+        {L"▛▀▚▙▄▞▌ ▐", L"▛▀▀▚▙▄▄▞▌  ▚▌  ▐"},
+        {L"▞▀▘▝▀▚▚▄▞", L"▞▀▀▚▚▄    ▀▚▚▄▄▞"},
+        {L"▀▜▀ ▐  ▐ ", L"▀▀▛▀  ▌   ▌   ▌ "},
+        {L"▌ ▐▌ ▐▚▄▞", L"▌  ▐▌  ▐▌  ▐▚▄▄▞"},
+        {L"▌ ▐▚ ▞▝▄▘", L"▌  ▐▌  ▐▚  ▞ ▚▞ "},
+        {L"▌ ▐▌▄▐▛ ▜", L"▌  ▐▌  ▐▌▞▚▐▛  ▜"},
+        {L"▚ ▞ █ ▞ ▚", L"▚  ▞ ▚▞  ▞▚ ▞  ▚"},
+        {L"▌ ▐▝▄▘ █ ", L"▌  ▐▝▖▗▘ ▝▌   ▌ "},
+        {L"▀▀▜▗▞▘▙▄▄", L"▀▀▀▜  ▄▘▗▀  ▙▄▄▄"},
+        {L"▐▀▘▐  ▐▄▖", L" ▛▀  ▌   ▌   ▙▄ "},
+        {L" █  █  █ ", L"▚    ▚    ▚    ▚"},
+        {L"▝▀▌  ▌▗▄▌", L" ▀▜   ▐   ▐  ▄▟ "},
+        {L" ▄ ▝ ▘   ", L" ▗▖  ▘▝         "},
+        {L"      ▄▄▄", L"            ▄▄▄▄"},
+        {L"▗   ▘    ", L" ▗    ▘         "},
+        {L"   ▞▀▟▚▄▜", L"▗▄▄▖▗▄▄▐▌  █▚▄▄▜"},
+        {L"▌  ▙▀▚▛▄▞", L"▌   ▌▄▄▖█  ▐▛▄▄▞"},
+        {L"   ▞▀▀▚▄▄", L"    ▗▄▄▄▌   ▚▄▄▄"},
+        {L"  ▐▞▀▟▚▄▜", L"   ▐▗▄▄▐▌  █▚▄▄▜"},
+        {L"   ▟█▙▚▄▄", L"    ▗▄▄▖▙▄▄▟▚▄▄▄"},
+        {L" ▞▖▗▙▖ ▌ ", L"  ▞▖ ▄▙▖  ▌   ▚ "},
+        {L"▞▀▟▚▄▜▗▄▞", L"▗▄▄▗▌  █▚▄▄▜▗▄▄▞"},
+        {L"▌  ▙▀▚▌ ▐", L"▌   ▌▄▄▖█  ▐▌  ▐"},
+        {L" ▘  ▌  ▚ ", L"  ▖   ▖   ▌   ▚ "},
+        {L" ▝  ▐ ▝▞ ", L"  ▖   ▖   ▌  ▚▘ "},
+        {L"▌  ▙▄▘▌ ▌", L"▌   ▌  ▗▙▄▄▘▌  ▚"},
+        {L" ▌  ▌  ▚ ", L"  ▌   ▌   ▌   ▚ "},
+        {L"   ▛▞▖▌▌▌", L"    ▖▄▗▖▛ ▌▐▌ ▌▐"},
+        {L"   ▛▀▚▌ ▐", L"    ▖▄▄▖▛  ▐▌  ▐"},
+        {L"   ▞▀▚▚▄▞", L"    ▗▄▄▖▌  ▐▚▄▄▞"},
+        {L"▞▀▚▙▄▞▌  ", L"▖▄▄▖█  ▐▛▄▄▞▌   "},
+        {L"▞▀▚▚▄▟  ▐", L"▗▄▄▗▌  █▚▄▄▜   ▐"},
+        {L"   ▙▀▚▌  ", L"    ▖▄▄▖▛  ▝▌   "},
+        {L"▗▄▖▚▄▖▗▄▞", L"    ▗▄▄▖▚▄▄▖▗▄▄▞"},
+        {L" ▌ ▀▛▀ ▚ ", L"  ▌  ▄▙▖  ▌   ▚ "},
+        {L"   ▌ ▐▚▄▟", L"    ▖  ▗▌  ▐▝▄▄▜"},
+        {L"   ▌ ▐▝▄▘", L"    ▖  ▗▚  ▞ ▚▞ "},
+        {L"   ▐▐▐▝▞▟", L"    ▖▗ ▗▌▐ ▐▚▞▄▜"},
+        {L"   ▝▄▘▗▀▖", L"    ▗  ▖ ▚▞ ▗▘▝▖"},
+        {L"▌ ▐▚▄▟▗▄▞", L"▖  ▗▌  ▐▝▄▄▌▗▄▄▘"},
+        {L"▄▄▄▗▄▞▙▄▄", L"    ▄▄▄▄ ▄▄▘▟▄▄▄"},
+        {L" ▛▘█   ▙▖", L" ▛▀ ▗▘  ▝▖   ▙▄ "},
+        {L"▚   ▚   ▚", L" ▐▌  ▐▌  ▐▌  ▐▌ "},
+        {L"▝▜   █▗▟ ", L" ▀▜   ▝▖  ▗▘ ▄▟ "},
+        {L"▗▖▗▘▝▘   ", L" ▄ ▖▝ ▀         "}
     };
 }
 
