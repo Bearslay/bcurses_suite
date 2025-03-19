@@ -915,14 +915,23 @@ namespace npp {
 
                     // Get the directions (connection styles) of the surrounding characters (for connecting to existing lines)
                     // This step is skipped if the line isn't suppsoed to merge with others
-                    if (canMerge) {dirs = {getConnectStyle(posy - 1, posx, DIR_DOWN, padding), getConnectStyle(posy + 1, posx, DIR_UP, padding), getConnectStyle(posy, posx - 1, DIR_RIGHT, padding), getConnectStyle(posy, posx + 1, DIR_LEFT, padding)};}
-                    else {dirs = {STYLE_NONE, STYLE_NONE, STYLE_NONE, STYLE_NONE};}
+                    if (canMerge) {
+                        dirs = {getConnectStyle(posy - 1, posx, DIR_DOWN, padding), getConnectStyle(posy + 1, posx, DIR_UP, padding), getConnectStyle(posy, posx - 1, DIR_RIGHT, padding), getConnectStyle(posy, posx + 1, DIR_LEFT, padding)};
+                    } else {
+                        dirs = {STYLE_NONE, STYLE_NONE, STYLE_NONE, STYLE_NONE};
+                    }
 
                     // With the exception of the end pieces, the line has to have directions fabricated in order to actually exist
-                    if (i == 0) {dirs[tdir2] = (dirs[tdir2] == STYLE_NONE && dirs[vertical ? DIR_LEFT : DIR_UP] == STYLE_NONE && dirs[vertical ? DIR_RIGHT : DIR_DOWN] == STYLE_NONE) ? cstyle : dirs[tdir2];}
-                    else {dirs[tdir2] = cstyle;}
-                    if (i == length - 1) {dirs[tdir1] = (dirs[tdir1] == STYLE_NONE && dirs[vertical ? DIR_LEFT : DIR_UP] == STYLE_NONE && dirs[vertical ? DIR_RIGHT : DIR_DOWN] == STYLE_NONE) ? cstyle : dirs[tdir1];}
-                    else {dirs[tdir1] = cstyle;}
+                    if (i == 0) {
+                        dirs[tdir2] = (dirs[tdir2] == STYLE_NONE && dirs[vertical ? DIR_LEFT : DIR_UP] == STYLE_NONE && dirs[vertical ? DIR_RIGHT : DIR_DOWN] == STYLE_NONE) ? cstyle : dirs[tdir2];
+                    } else {
+                        dirs[tdir2] = cstyle;
+                    }
+                    if (i == length - 1) {
+                        dirs[tdir1] = (dirs[tdir1] == STYLE_NONE && dirs[vertical ? DIR_LEFT : DIR_UP] == STYLE_NONE && dirs[vertical ? DIR_RIGHT : DIR_DOWN] == STYLE_NONE) ? cstyle : dirs[tdir1];
+                    } else {
+                        dirs[tdir1] = cstyle;
+                    }
 
                     piece = getPiece(dirs, style);
 
