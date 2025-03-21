@@ -3,16 +3,15 @@
 
 #include <ncurses.h>
 #include <locale.h>
-#include <unordered_map>
 
 #include "bengine_helpers.hpp"
 
 namespace bengine {
     class curses_window {
         private:
-            static const std::vector<unsigned char> box_drawing_key;
-            static const std::wstring box_drawing_chars;
-            static const std::vector<std::wstring> matrix_text_key;
+            static const std::wstring box_drawing_key;
+            static const std::wstring box_drawing_key_alt;
+            static const std::vector<std::vector<std::wstring>> matrix_text_key;
 
             static unsigned char default_cell_color_pair;
             static unsigned short default_cell_attributes;
@@ -557,20 +556,20 @@ namespace bengine {
             static unsigned char extract_main_style(const unsigned short &style, const bool &horizontal) {
                 switch (bengine::bitwise_manipulator::get_subvalue(style, 0, 8)) {
                     default:
-                    case bengine::curses_window::box_drawing_styles::LIGHT_SQUARE:
-                    case bengine::curses_window::box_drawing_styles::LIGHT_ROUNDED:
+                    case 1:
+                    case 2:
                         return 1;
-                    case bengine::curses_window::box_drawing_styles::HEAVY_BOTH:
+                    case 4:
                         return 2;
-                    case bengine::curses_window::box_drawing_styles::HEAVY_HORIZONTAL:
+                    case 8:
                         return horizontal ? 2 : 1;
-                    case bengine::curses_window::box_drawing_styles::HEAVY_VERTICAL:
+                    case 16:
                         return horizontal ? 1 : 2;
-                    case bengine::curses_window::box_drawing_styles::DOUBLED_BOTH:
+                    case 32:
                         return 3;
-                    case bengine::curses_window::box_drawing_styles::DOUBLED_HORIZONTAL:
+                    case 64:
                         return horizontal ? 3 : 1;
-                    case bengine::curses_window::box_drawing_styles::DOUBLED_VERTICAL:
+                    case 128:
                         return horizontal ? 1 : 3;
                 }
             }
@@ -579,78 +578,172 @@ namespace bengine {
              * \param horizontal Whether the line to draw will be horiztonal or not
              * \returns A number 0-5 representing the dashing style
              */
-            static unsigned char extract_dash_style(const unsigned short &style/*, const bool &horizontal*/) {
-                // const unsigned char main_style = bengine::bitwise_manipulator::get_subvalue(style, 0, 8);
-                // // following styles and directions will never have dashes
-                // if (main_style == bengine::curses_window::box_drawing_styles::DOUBLED_BOTH) {
-                //     return 0;
-                // } else if (horizontal && main_style == bengine::curses_window::box_drawing_styles::HEAVY_VERTICAL || main_style == bengine::curses_window::box_drawing_styles::DOUBLED_VERTICAL) {
-                //     return 0;
-                // } else if (main_style == bengine::curses_window::box_drawing_styles::HEAVY_HORIZONTAL || main_style == bengine::curses_window::box_drawing_styles::DOUBLED_HORIZONTAL) {
-                //     return 0;
-                // }
-
-                switch (bengine::bitwise_manipulator::get_subvalue(style, 8, 6) - 256) {
+            static unsigned char extract_dash_style(const unsigned short &style) {
+                switch (bengine::bitwise_manipulator::get_subvalue(style, 8, 6)) {
                     default:
-                    case bengine::curses_window::box_drawing_styles::NO_DASH:
+                    case 1:
                         return 0;
-                    case bengine::curses_window::box_drawing_styles::DOUBLE_DASH:
+                    case 2:
                         return 1;
-                    case bengine::curses_window::box_drawing_styles::TRIPLE_DASH:
+                    case 4:
                         return 2;
-                    case bengine::curses_window::box_drawing_styles::QUADRUPLE_DASH:
+                    case 8:
                         return 3;
-                    case bengine::curses_window::box_drawing_styles::SINGLE_DASH_1:
+                    case 16:
                         return 4;
-                    case bengine::curses_window::box_drawing_styles::SINGLE_DASH_2:
+                    case 32:
                         return 5;
                 }
             }
 
             /** Get the main box drawing style from a character in a specific direction
-             * \param character The character to examine line
-             * \param direction The direction to analyze relative to the character (0 = up, 1 = left, 2 = right, 3 = down)
-             * \returns An integer 0-3 matching the style (0 for no style, 1 for light, 2 for heavy, 3 for doubled)
+             * \param character The character to examine
+             * \param direction The direction to examine relative to the character (0 = up, 1 = left, 2 = right, 3 = down)
+             * \returns An integer 0-3 matching the given character's style (0 for no style or non-box drawing character, 1 for light, 2 for heavy, 3 for doubled)
              */
             static unsigned char extract_style_from_character(const wchar_t &character, const unsigned char &direction) {
-                for (std::size_t i = 0; i < bengine::curses_window::box_drawing_chars.size(); i++) {
-                    if (character == bengine::curses_window::box_drawing_chars.at(i)) {
-                        bengine::bitwise_manipulator::get_subvalue(bengine::curses_window::box_drawing_key.at(i), 6 - direction * 2, 2);
+                std::size_t index = bengine::curses_window::box_drawing_key.find(character);
+                if (index == std::string::npos) {
+                    switch (character) {
+                        case L'─':
+                        case L'╌':
+                        case L'┄':
+                        case L'┈':
+                            index = 19;
+                            break;
+                        case L'━':
+                        case L'╍':
+                        case L'┅':
+                        case L'┉':
+                            index = 39;
+                            break;
+                        case L'│':
+                        case L'╎':
+                        case L'┆':
+                        case L'┊':
+                            index = 64;
+                            break;
+                        case L'┃':
+                        case L'╏':
+                        case L'┇':
+                        case L'┋':
+                            index = 64;
+                            break;
+                        case L'╭':
+                            index = 4;
+                            break;
+                        case L'╮':
+                            index = 16;
+                            break;
+                        case L'╰':
+                            index = 67;
+                            break;
+                        case L'╯':
+                            index = 79;
+                            break;
+                        default:
+                            return 0;
                     }
                 }
-                return 0;
+                return bengine::bitwise_manipulator::get_subvalue(index + 1, 6 - direction * 2, 2);
             }
             /** Find a box drawing character that would merge properly with surrounding neighbors
              * \param neighbors The values of the neighbors (light, heavy, doubled, none) to base the output character on
-             * \param style The style that the returned character should be (needed for a few special character cases)
+             * \param main_style The main style that the returned character should be (needed if the line is doubled so that an alternative key can be used to make better looking lines)
+             * \param dash_style The dash style that the returned character should be (needed for any non-doubled straight lines)
+             * \param use_hard_corners Whether to use hard corners or not (should only be true when the main style is LIGHT_ROUNDED)
              * \returns A box drawing character that merges properly with surrounding neighbors (a space if no appropriate character is found)
              */
-            static wchar_t find_character_with_style_values(const unsigned char &neighbors, const unsigned short &style) {
+            static wchar_t find_character_with_style_values(const unsigned char &neighbors, const unsigned char &main_style, const unsigned char &dash_style, const bool &use_hard_corners) {
                 switch (neighbors) {
-                    // Light and heavy box drawing pieces must be processed seperately because they might be dashed (while having the same style signatures)
+                    case 0:
+                        return L' ';
                     case 20:
-                        return bengine::curses_window::box_drawing_chars.at(93 + bengine::curses_window::extract_dash_style(style));
-                    case 40:
-                        return bengine::curses_window::box_drawing_chars.at(99 + bengine::curses_window::extract_dash_style(style));
-                    case 65:
-                        return bengine::curses_window::box_drawing_chars.at(105 + bengine::curses_window::extract_dash_style(style));
-                    case 130:
-                        return bengine::curses_window::box_drawing_chars.at(111 + bengine::curses_window::extract_dash_style(style));
-                    // Light corners pieces must be processed seperated because they might be hard or rounded (while having the same style signatures)
-                    case 5:
-                        return bengine::curses_window::box_drawing_chars.at(117 + (bengine::bitwise_manipulator::get_subvalue(style, 0, 8) == bengine::curses_window::box_drawing_styles::LIGHT_ROUNDED));
-                    case 17:
-                        return bengine::curses_window::box_drawing_chars.at(119 + (bengine::bitwise_manipulator::get_subvalue(style, 0, 8) == bengine::curses_window::box_drawing_styles::LIGHT_ROUNDED));
-                    case 68:
-                        return bengine::curses_window::box_drawing_chars.at(121 + (bengine::bitwise_manipulator::get_subvalue(style, 0, 8) == bengine::curses_window::box_drawing_styles::LIGHT_ROUNDED));
-                    case 80:
-                        return bengine::curses_window::box_drawing_chars.at(123 + (bengine::bitwise_manipulator::get_subvalue(style, 0, 8) == bengine::curses_window::box_drawing_styles::LIGHT_ROUNDED));
-                    default:
-                        for (std::size_t i = 0; i < bengine::curses_window::box_drawing_key.size(); i++) {
-                            if (neighbors == bengine::curses_window::box_drawing_key.at(i)) {
-                                return bengine::curses_window::box_drawing_chars.at(i);
-                            }
+                        switch (dash_style) {
+                            default:
+                            case 0:
+                                return L'─';
+                            case 1:
+                                return L'╌';
+                            case 2:
+                                return L'┄';
+                            case 3:
+                                return L'┈';
+                            case 4:
+                                return L'╴';
+                            case 5:
+                                return L'╶';
                         }
+                    case 40:
+                        switch (dash_style) {
+                            default:
+                            case 0:
+                                return L'━';
+                            case 1:
+                                return L'╍';
+                            case 2:
+                                return L'┅';
+                            case 3:
+                                return L'┉';
+                            case 4:
+                                return L'╸';
+                            case 5:
+                                return L'╺';
+                        }
+                    case 65:
+                        switch (dash_style) {
+                            default:
+                            case 0:
+                                return L'│';
+                            case 1:
+                                return L'╎';
+                            case 2:
+                                return L'┆';
+                            case 3:
+                                return L'┊';
+                            case 4:
+                                return L'╵';
+                            case 5:
+                                return L'╷';
+                        }
+                    case 130:
+                        switch (dash_style) {
+                            default:
+                            case 0:
+                                return L'┃';
+                            case 1:
+                                return L'╏';
+                            case 2:
+                                return L'┇';
+                            case 3:
+                                return L'┋';
+                            case 4:
+                                return L'╹';
+                            case 5:
+                                return L'╻';
+                        }
+                    case 5:
+                        if (use_hard_corners) {
+                            return L'╭';
+                        }
+                        return L'┌';
+                    case 17:
+                        if (use_hard_corners) {
+                            return L'╮';
+                        }
+                        return L'┐';
+                    case 68:
+                        if (use_hard_corners) {
+                            return L'╰';
+                        }
+                        return L'└';
+                    case 80:
+                        if (use_hard_corners) {
+                            return L'╯';
+                        }
+                        return L'┘';
+                    default:
+                        return main_style == 3 ? bengine::curses_window::box_drawing_key_alt.at(neighbors - 1) : bengine::curses_window::box_drawing_key.at(neighbors - 1);
                 }
                 return L' ';
             }
@@ -659,107 +752,166 @@ namespace bengine {
              * \param left The style of the left neighbor (light, heavy, doubled)
              * \param right The style of the right neighbor (light, heavy, doubled)
              * \param down The style of the down neighbor (light, heavy, doubled)
-             * \param style The style that the returned character should be (needed for a few special character cases)
+             * \param main_style The main style that the returned character should be (needed if the line is doubled so that an alternative key can be used to make better looking lines)
+             * \param dash_style The dash style that the returned character should be (needed for any non-doubled straight lines)
+             * \param use_hard_corners Whether to use hard corners or not (should only be true when the main style is LIGHT_ROUNDED)
              * \returns A box drawing character that merges properly with surrounding neighbors (a space if no appropriate character is found)
              */
-            static wchar_t find_character_with_style_values(const unsigned char &up, const unsigned char &left, const unsigned char &right, const unsigned char &down, const unsigned short &style) {
-                return bengine::curses_window::find_character_with_style_values((up << 6) + (static_cast<unsigned char>(left << 6) >> 2) + (static_cast<unsigned char>(right << 6) >> 4) + (static_cast<unsigned char>(down << 6) >> 6), style);
+            static wchar_t find_character_with_style_values(const unsigned char &up, const unsigned char &left, const unsigned char &right, const unsigned char &down, const unsigned char &main_style, const unsigned char &dash_style, const bool &use_hard_corners) {
+                return bengine::curses_window::find_character_with_style_values((up << 6) + (static_cast<unsigned char>(left << 6) >> 2) + (static_cast<unsigned char>(right << 6) >> 4) + (static_cast<unsigned char>(down << 6) >> 6), main_style, dash_style, use_hard_corners);
             }
 
         public:
-            void draw_horizontal_line(unsigned short x, const unsigned short &y, int length, const unsigned short &style, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes, const bool &merge_with_other_lines = bengine::curses_window::default_line_merging_preference) {
-                // set x, y, and length to values that ensures that length is a positive number
+            /** Draw a horizontal line using Unicode Box Drawing Characters
+             * \param x x-position (col) the line starts at
+             * \param y y-position (row) the line starts at
+             * \param length Length of the line in characters; positive value makes line draw to the right and negative value makes line draw to the left (0 doesn't do anything)
+             * \param style Combination value that encodes the main style of the line (light, heavy, doubled, etc) as well as the dashing style (none, double, triple, etc)
+             * \param color The color pair to use for the line
+             * \param attributes Attributes for each cell in the line, though many don't actually affect anything; all cells changed by this function will have the attribute of BOX_DRAWING_MERGABLE added to them
+             * \param merge_with_other_lines Whether this new line should merge with other box drawing characters if encountered (but only if they're mergable as well)
+             * \returns A coordinate pair corresponding to the last character drawn in the line
+             */
+            std::pair<unsigned short, unsigned short> draw_horizontal_line(unsigned short x, const unsigned short &y, int length, const unsigned short &style, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes, const bool &merge_with_other_lines = bengine::curses_window::default_line_merging_preference) {
+                // minimum length of a line is 1 since length is measured in characters, also yeah the line needs to be at the right y-level to even have a chance of being within the window
+                if (length == 0 || y >= this->get_height()) {
+                    return {x, y};
+                }
+
+                std::pair<unsigned short, unsigned short> output = {x, y};
+
+                // set x and length to values that ensures that length is a positive number
                 if (length < 0) {
                     length = -length;
-                    x -= length;
-                }
-
-                // no line to draw if starting x or y is beyond the window's bounds
-                if (!check_coordinate_bounds(x, y)) {
-                    return;
-                }
-
-                // trim the line if it extends beyond the window's bounds
-                if (x + length >= this->get_width()) {
-                    length = this->get_width() - x;
+                    if (length > x + 1) {
+                        length = x + 1;
+                        x = 0;
+                    } else {
+                        x -= length - 1;
+                        if (x >= this->get_width()) {
+                            return output;
+                        }
+                    }
+                    output.first = x - length + 1;
+                } else if (x >= this->get_width()) {
+                    return output;
+                } else {
+                    // trim the line if it extends beyond the window's bounds
+                    // this code segment can make the line length negative again, but only when x is beyond the window (which this code doesn't execute is that's the case)
+                    if (x + length - 1 >= this->get_width()) {
+                        length = this->get_width() - x;
+                    }
                 }
 
                 const unsigned char main_style = bengine::curses_window::extract_main_style(style, true);
-                const unsigned char dash_style = bengine::curses_window::extract_dash_style(style/*, horiztonal*/);
+                const unsigned char dash_style = bengine::curses_window::extract_dash_style(style);
+                const bool use_hard_corners = bengine::bitwise_manipulator::get_subvalue(style, 0, 8) == bengine::curses_window::LIGHT_ROUNDED;
 
                 // If no merging is to happen, then drawing the line becomes very simple
                 if (!merge_with_other_lines) {
-                    const wchar_t line_char = bengine::curses_window::find_character_with_style_values(0, main_style, main_style, 0, style);
+                    const wchar_t line_char = bengine::curses_window::find_character_with_style_values(0, main_style, main_style, 0, main_style, dash_style, use_hard_corners);
                     for (unsigned short i = 0; i < length; i++) {
-                        this->write_character(x + i, y, line_char, {color, attributes, 0, 0});
+                        this->write_character(x + i, y, line_char, {color, static_cast<unsigned short>(attributes | BOX_DRAWING_MERGABLE), 0, 0});
                     }
-                    return;
+                    return {output.first + length - 1, output.second};
                 }
 
                 for (unsigned short i = 0; i < length; i++) {
                     unsigned char neighbors = (bengine::curses_window::extract_style_from_character(this->get_cell_character(x, y - 1), 3) << 6) + bengine::curses_window::extract_style_from_character(this->get_cell_character(x, y + 1), 0);
 
-                    // if not at the start of the line, then the left neighbor shall always be the desired style
-                    // if at the start of the line and the vertical neighbors + the left neighbor are all non-existent, then also fabricate left neighbor
-                    if (i > 0 || (bengine::curses_window::extract_style_from_character(this->get_cell_character(x - 1, y), 2) == 0 && neighbors == 0)) {
-                        neighbors = bengine::bitwise_manipulator::set_subvalue(neighbors, main_style, 4, 2);
+                    if (i == 0 && neighbors != 0) {
+                        neighbors += bengine::curses_window::extract_style_from_character(this->get_cell_character(x - 1, y), 2) << 4;
+                    } else {
+                        neighbors += main_style << 4;
                     }
-                    // if at the start of the line and either vertical neighbors or the left neighbor exists, then the left neighbor should match whatever was found (even if zero)
-                    else {
-                        neighbors = bengine::bitwise_manipulator::set_subvalue(neighbors, bengine::curses_window::extract_style_from_character(this->get_cell_character(x - 1, y), 2), 4, 2);
-                    }
-
-                    // if not at the end of the line, then the right neighbor shall always be the desired style
-                    // if at the end of the line and the vertical neighbors + the right neighbors are all non-existent, then also fabricate the right neighbor
-                    if (i < length - 1 || (bengine::curses_window::extract_style_from_character(this->get_cell_character(x + 1, y), 1) == 0 && bengine::bitwise_manipulator::get_subvalue(neighbors, 6, 2) == 0 && bengine::bitwise_manipulator::get_subvalue(neighbors, 0, 2) == 0)) {
-                        neighbors = bengine::bitwise_manipulator::set_subvalue(neighbors, main_style, 2, 2);
-                    }
-                    // if at the end of the line and either vertical neighbors or the right neighbor exists, then the right neighbor should match whatever was found (even if zero)
-                    else {
-                        neighbors = bengine::bitwise_manipulator::set_subvalue(neighbors, bengine::curses_window::extract_style_from_character(this->get_cell_character(x + 1, y), 1), 2, 2);
+                    if (i == length - 1 && (bengine::bitwise_manipulator::get_subvalue(neighbors, 6, 2) != 0 || bengine::bitwise_manipulator::get_subvalue(neighbors, 0, 2) != 0)) {
+                        neighbors += bengine::curses_window::extract_style_from_character(this->get_cell_character(x + 1, y), 1) << 2;
+                    } else {
+                        neighbors += main_style << 2;
                     }
 
-                    wchar_t piece = bengine::curses_window::find_character_with_style_values(neighbors, style);
+                    wchar_t piece = bengine::curses_window::find_character_with_style_values(neighbors, main_style, dash_style, use_hard_corners);
 
-                    // the character set that unicode provides doesn't account for every possible intersection of light, heavy, or doubled lines
-                    // the main issue stems from a lack of characters relating to the doubled set, where it can only merge with the light char set (and itself) and only if the other line doesn't end at the intersection
-                    // to account for the missing characters, heavy neighbors are converted into light ones if the line is doubled or doubled neighbors are converted into heavy ones in any other case
-                    // while the results aren't perfect, these neighbor conversions keep the most recent line intact while looking just about right; this section of the algorithm should be relatively rare anyways
-                    if (piece == L' ') {
-                        // doubled line: convert any existent side neighbors to light
-                        if (bengine::bitwise_manipulator::get_subvalue(style, 0, 8) >= 32 && bengine::bitwise_manipulator::get_subvalue(style, 0, 8) <= 128) {
-                            
-                        } else {
+                    this->write_string(0, i * 4, bengine::string_helper::to_wstring(bengine::string_helper::to_string_with_added_zeros(static_cast<int>(i), 3, 0, false) + ":"));
+                    this->write_string(5, i * 4, bengine::string_helper::to_wstring(bengine::bitwise_manipulator::get_subvalue(neighbors, 6, 2)));
+                    this->write_string(4, i * 4 + 1, bengine::string_helper::to_wstring(bengine::bitwise_manipulator::get_subvalue(neighbors, 4, 2)));
+                    this->write_string(6, i * 4 + 1, bengine::string_helper::to_wstring(bengine::bitwise_manipulator::get_subvalue(neighbors, 2, 2)));
+                    this->write_string(5, i * 4 + 2, bengine::string_helper::to_wstring(bengine::bitwise_manipulator::get_subvalue(neighbors, 0, 2)));
+                    this->write_character(5, i * 4 + 1, piece);
 
-                        }
-                    }
+                    this->write_character(x, y, piece, {color, static_cast<unsigned short>(attributes | BOX_DRAWING_MERGABLE), 0, 0});
+                    x++;
                 }
+
+                return {x, output.second};
             }
-            void draw_vertical_line(const unsigned short &x, unsigned short y, int length, const unsigned short &style, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes, const bool &merge_with_other_lines = bengine::curses_window::default_line_merging_preference) {
-                // see bengine::curses_window::draw_horizontal_line() for comments relating to the rationale behind this function's code
+            std::pair<unsigned short, unsigned short> draw_vertical_line(const unsigned short &x, unsigned short y, int length, const unsigned short &style, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes, const bool &merge_with_other_lines = bengine::curses_window::default_line_merging_preference) {
+                if (length == 0 || x >= this->get_width()) {
+                    return {x, y};
+                }
+
+                std::pair<unsigned short, unsigned short> output = {x, y};
+
                 if (length < 0) {
                     length = -length;
-                    y -= length;
-                }
-
-                if (!check_coordinate_bounds(x, y)) {
-                    return;
-                }
-
-                if (y + length >= this->get_height()) {
-                    length = this->get_height() - y;
+                    if (length > y + 1) {
+                        length = y + 1;
+                        y = 0;
+                    } else {
+                        y -= length - 1;
+                        if (y >= this->get_height()) {
+                            return output;
+                        }
+                    }
+                    output.second = y - length + 1;
+                } else if (y >= this->get_height()) {
+                    return output;
+                } else {
+                    if (y + length - 1 >= this->get_height()) {
+                        length = this->get_height() - y;
+                    }
                 }
 
                 const unsigned char main_style = bengine::curses_window::extract_main_style(style, false);
-                const unsigned char dash_style = bengine::curses_window::extract_dash_style(style/*, horiztonal*/);
+                const unsigned char dash_style = bengine::curses_window::extract_dash_style(style);
+                const bool use_hard_corners = bengine::bitwise_manipulator::get_subvalue(style, 0, 8) == bengine::curses_window::LIGHT_ROUNDED;
 
                 if (!merge_with_other_lines) {
-                    const wchar_t line_char = bengine::curses_window::find_character_with_style_values(0, main_style, main_style, 0, style);
+                    const wchar_t line_char = bengine::curses_window::find_character_with_style_values(main_style, 0, 0, main_style, main_style, dash_style, use_hard_corners);
                     for (unsigned short i = 0; i < length; i++) {
-                        this->write_character(x, y + i, line_char, {color, attributes, 0, 0});
+                        this->write_character(x, y + i, line_char, {color, static_cast<unsigned short>(attributes | BOX_DRAWING_MERGABLE), 0, 0});
                     }
-                    return;
+                    return {output.first, output.second + length - 1};
                 }
+
+                for (unsigned short i = 0; i < length; i++) {
+                    unsigned char neighbors = (bengine::curses_window::extract_style_from_character(this->get_cell_character(x - 1, y), 2) << 4) + (bengine::curses_window::extract_style_from_character(this->get_cell_character(x + 1, y), 1) << 2);
+
+                    if (i == 0 && neighbors != 0) {
+                        neighbors += bengine::curses_window::extract_style_from_character(this->get_cell_character(x, y - 1), 3);
+                    } else {
+                        neighbors += main_style;
+                    }
+                    if (i == length - 1 && (bengine::bitwise_manipulator::get_subvalue(neighbors, 4, 2) != 0 || bengine::bitwise_manipulator::get_subvalue(neighbors, 2, 2) != 0)) {
+                        neighbors += bengine::curses_window::extract_style_from_character(this->get_cell_character(x, y + 1), 0) << 6;
+                    } else {
+                        neighbors += main_style << 6;
+                    }
+
+                    wchar_t piece = bengine::curses_window::find_character_with_style_values(neighbors, main_style, dash_style, use_hard_corners);
+
+                    this->write_string(0, i * 4, bengine::string_helper::to_wstring(bengine::string_helper::to_string_with_added_zeros(static_cast<int>(i), 3, 0, false) + ":"));
+                    this->write_string(5, i * 4, bengine::string_helper::to_wstring(bengine::bitwise_manipulator::get_subvalue(neighbors, 6, 2)));
+                    this->write_string(4, i * 4 + 1, bengine::string_helper::to_wstring(bengine::bitwise_manipulator::get_subvalue(neighbors, 4, 2)));
+                    this->write_string(6, i * 4 + 1, bengine::string_helper::to_wstring(bengine::bitwise_manipulator::get_subvalue(neighbors, 2, 2)));
+                    this->write_string(5, i * 4 + 2, bengine::string_helper::to_wstring(bengine::bitwise_manipulator::get_subvalue(neighbors, 0, 2)));
+                    this->write_character(5, i * 4 + 1, piece);
+
+                    this->write_character(x, y, piece, {color, static_cast<unsigned short>(attributes | BOX_DRAWING_MERGABLE), 0, 0});
+                    y++;
+                }
+
+                return {output.first, y};
             }
     };
     unsigned char bengine::curses_window::default_cell_color_pair = bengine::curses_window::preset_colors::WHITE;
@@ -772,11 +924,9 @@ namespace bengine {
     unsigned short bengine::curses_window::default_box_drawing_style = bengine::curses_window::box_drawing_styles::LIGHT_SQUARE | bengine::curses_window::box_drawing_styles::NO_DASH;
 
     bool bengine::curses_window::default_line_merging_preference = true;
-    // const std::vector<unsigned char> bengine::curses_window::box_drawing_key = {5, 6, 7, 9, 10, 13, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 33, 34, 36, 37, 38, 40, 41, 42, 49, 51, 60, 61, 63, 65, 66, 68, 69, 70, 72, 73, 74, 76, 77, 80, 81, 82, 84, 85, 86, 88, 89, 90, 96, 97, 98, 100, 101, 102, 104, 105, 106, 112, 113, 124, 125, 129, 130, 132, 133, 134, 136, 137, 138, 144, 145, 146, 148, 149, 150, 152, 153, 154, 160, 161, 162, 164, 165, 166, 168, 169, 170, 195, 196, 199, 204, 207, 208, 211, 212, 215, 240, 243, 252, 255, 5, 17, 68, 80, 20, 20, 20, 20, 20, 40, 40, 40, 40, 40, 65, 65, 65, 65, 65, 130, 130, 130, 130, 130}; // [00000000][__,__,__,__]: up left right down
-    const std::vector<unsigned char> bengine::curses_window::box_drawing_key = {60, 195, 21, 69, 81, 84, 85, 10, 34, 136, 160, 42, 138, 162, 168, 170, 15, 51, 204, 240, 63, 207, 243, 252, 255, 9, 33, 72, 96, 41, 73, 97, 104, 105, 6, 18, 132, 144, 22, 134, 146, 148, 150, 13, 49, 76, 112, 61, 77, 113, 124, 125, 7, 19, 196, 208, 23, 199, 211, 212, 215, 24, 25, 26, 36, 37, 38, 66, 70, 74, 82, 86, 88, 89, 90, 98, 100, 101, 102, 106, 129, 133, 137, 145, 149, 152, 153, 154, 161, 164, 165, 166, 169, 20, 20, 20, 20, 20, 20, 40, 40, 40, 40, 40, 40, 65, 65, 65, 65, 65, 65, 130, 130, 130, 130, 130, 130, 5, 17, 68, 80, 5, 17, 68, 80};
-    // const std::wstring bengine::curses_window::box_drawing_chars = L"┌┎╓┍┏╒╔┐┒╖─┬┰╥╼┮┲┑┓╾┭┱━┯┳╕╗═╤╦│╽└├┟┕┝┢╘╞┘┤┧┴┼╁┶┾╆┙┥┪┵┽╅┷┿╈╛╡╧╪╿┃┖┞┠┗┡┣┚┦┨┸╀╂┺╄╊┛┩┫┹╃╉┻╇╋║╙╟╚╠╜╢╨╫╝╣╩╬╭╮╰╯╌┄┈╴╶╍┅┉╸╺╎┆┊╵╷╏┇┋╹╻"; // indexes for special case characters: light rounded: 100, light horizontal: 104, heavy horizontal: 109, light vertical: 114, heavy vertical: 119
-    const std::wstring bengine::curses_window::box_drawing_chars = L"═║┬├┤┴┼┏┓┗┛┳┣┫┻╋╔╗╚╝╦╠╣╩╬┍┑┕┙┯┝┥┷┿┎┒┖┚┰┠┨┸╂╒╕╘╛╤╞╡╧╪╓╖╙╜╥╟╢╨╫╼┮┲╾┭┱╽┟┢┧╁┶┾╆┪┵┽╅╈╿┞┡┦╀┺╄╊┩┹╃╉╇─╌┄┈╴╶━╍┅┉╸╺│╎┆┊╵╷┃╏┇┋╹╻┌╭┐╮└╰┘╯";
-    const std::vector<std::wstring> bengine::curses_window::matrix_text_key = {
+    const std::wstring bengine::curses_window::box_drawing_key = L"╷╻╻╶┌┎╓╺┍┏┏╺╒┏╔╴┐┒╖─┬┰╥╼┮┲┲╼┮┲┲╸┑┓┓╾┭┱┱━┯┳┳━┯┳┳╸╕┓╗╾┱┱┱━┯┳┳═╤┳╦╵│╽╽└├┟┟┕┝┢┢╘╞┢┢┘┤┧┧┴┼╁╁┶┾╆╆┶┾╆╆┙┥┪┪┵┽╅╅┷┿╈╈┷┿╈╈╛╡┪┪┵┽╅╅┷┿╈╈╧╪╈╈╹╿┃┃┖┞┠┠┗┡┣┣┗┡┣┣┚┦┨┨┸╀╂╂┺╄╊╊┺╄╊╊┛┩┫┫┹╃╉╉┻╇╋╋┻╇╋╋┛┩┫┫┹╃╉╉┻╇╋╋┻╇╋╋╹╿┃║╙┞┠╟┗┡┣┣╚┡┣╠╜┦┨╢╨╀╂╫┺╄╊╊┺╄╊╊┛┩┫┫┹╃╉╉┻╇╋╋┻╇╋╋╝┩┫╣┹╃╉╉┻╇╋╋╩╇╋╬";
+    const std::wstring bengine::curses_window::box_drawing_key_alt = L"╷╻║╶┌┎╓╺┍┏╔═╒╔╔╴┐┒╖─┬┰╥╼┮┲╦═╤╦╦╸┑┓╗╾┭┱╦━┯┳╦═╤╦╦═╕╗╗═╤╦╦═╤╦╦═╤╦╦╵│╽║└├┟╟┕┝┢╠╘╞╠╠┘┤┧╢┴┼╁╫┶┾╆╬╧╪╬╬┙┥┪╣┵┽╅╬┷┿╈╬╧╪╬╬╛╡╣╣╧╪╬╬╧╪╬╬╧╪╬╬╹╿┃║┖┞┠╟┗┡┣╠╚╠╠╠┚┦┨╢┸╀╂╫┺╄╊╬╩╬╬╬┘┩┫╣┹╃╉╬┻╇╋╬╩╬╬╬╝╣╣╣╩╬╬╬╩╬╬╬╩╬╬╬║║║║╙╟╟╟╚╠╠╠╚╠╠╠╜╢╢╢╨╫╫╫╩╬╬╬╩╬╬╬╝╣╣╣╩╬╬╬╩╬╬╬╩╬╬╬╝╣╣╣╩╬╬╬╩╬╬╬╩╬╬╬";
+    const std::vector<std::vector<std::wstring>> bengine::curses_window::matrix_text_key = {
         {L"         ", L"                "},
         {L" █  █  ▄ ", L" ▐▌  ▐▌  ▝▘  ▐▌ "},
         {L"▗ ▖▝ ▘   ", L"  ▖   ▘         "},

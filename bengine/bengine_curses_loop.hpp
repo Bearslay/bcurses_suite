@@ -155,13 +155,13 @@ namespace bengine {
                             if (current_cols != COLS || current_rows != LINES) {
                                 current_cols = COLS;
                                 current_rows = LINES;
-                                line_1_col = COLS / 2 - 9 - (static_cast<unsigned char>(std::log10(COLS)) + static_cast<unsigned char>(std::log10(LINES)) + 2) / 2;
-                                line_2_col = COLS / 2 - 9 - (static_cast<unsigned char>(std::log10(this->minimum_cols)) + static_cast<unsigned char>(std::log10(this->minimum_rows)) + 2) / 2;
+                                line_1_col = COLS / 2 - 10 - (static_cast<unsigned char>(std::log10(COLS)) + static_cast<unsigned char>(std::log10(LINES)) + 2) / 2;
+                                line_2_col = COLS / 2 - 10 - (static_cast<unsigned char>(std::log10(this->minimum_cols)) + static_cast<unsigned char>(std::log10(this->minimum_rows)) + 2) / 2;
 
                                 clear();
                                 attron(COLOR_PAIR(1));
 
-                                mvprintw(LINES / 2 - 2, COLS / 2 - 11, "Terminal Size Too Small");
+                                mvprintw(LINES / 2 - 2, COLS / 2 - 12, "Terminal Size Too Small:");
                                 mvprintw(LINES / 2 - 1, line_1_col, "Width = %d Height = %d", COLS, LINES);
                                 mvprintw(LINES / 2 + 1, COLS / 2 - 13, "Needed For Current Config:");
                                 mvprintw(LINES / 2 + 2, line_2_col, "Width = %d Height = %d", this->minimum_cols, this->minimum_rows);
