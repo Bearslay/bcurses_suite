@@ -436,7 +436,7 @@ namespace bengine {
                             continue;
                         }
                         // Check if the current tile is in-bounds
-                        if (y + i < 0 || y + i >= grid.size() || x + j < 0 || x + j >= grid.at(0).size()) {
+                        if (y + i >= grid.size() || x + j >= grid.at(0).size()) {
                             continue;
                         }
                         // Update the mask value for the current tile
@@ -462,7 +462,7 @@ namespace bengine {
                 for (char i = -1; i <= 1; i++) {
                     for (char j = -1; j <= 1; j++) {
                         // Check if the current tile is in-bounds
-                        if (y + i < 0 || y + i >= grid.size() || x + j < 0 || x + j >= grid.at(0).size()) {
+                        if (y + i >= grid.size() || x + j >= grid.at(0).size()) {
                             continue;
                         }
                         // Update the mask value for the current tile
@@ -487,7 +487,7 @@ namespace bengine {
                 }
                 for (std::size_t i = 0; i < grid.size(); i++) {
                     for (std::size_t j = 0; j < grid.at(i).size(); j++) {
-                        output[i][j] = bengine::autotiler::calculate_4_bit_mask(output, j, i, false);
+                        output[i][j] = bengine::autotiler::calculate_4_bit_mask(output, j, i, use_solid_boundaries);
                     }
                 }
                 return output;
@@ -508,7 +508,7 @@ namespace bengine {
                 }
                 for (std::size_t i = 0; i < grid.size(); i++) {
                     for (std::size_t j = 0; j < grid.at(i).size(); j++) {
-                        output[i][j] = bengine::autotiler::calculate_8_bit_mask(output, j, i, false);
+                        output[i][j] = bengine::autotiler::calculate_8_bit_mask(output, j, i, use_solid_boundaries);
                     }
                 }
                 return output;
@@ -686,7 +686,10 @@ namespace bengine {
             template <class value_type, class subvalue_type = value_type> static subvalue_type get_subvalue(const value_type &value, const unsigned char &subvalue_start, const unsigned char &subvalue_range) {
                 static_assert(std::is_integral<value_type>::value, "Template type \"value_type\" must be an integral type (int, long, unsigned char, etc)");
                 static_assert(std::is_integral<subvalue_type>::value, "Template type \"subvalue_type\" must be an integral type (int, long, unsigned char, etc)");
-                const unsigned char max_bitshift = sizeof(value) * 8 - 1 - subvalue_range;
+                if (subvalue_range < 1) {
+                    return 0;
+                }
+                const unsigned char max_bitshift = sizeof(value) * 8 - subvalue_range;
                 return static_cast<subvalue_type>(static_cast<value_type>(value << (max_bitshift - subvalue_start)) >> max_bitshift);
             }
 
