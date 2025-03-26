@@ -21,6 +21,7 @@ namespace bengine {
             static wchar_t default_cell_character;
             static unsigned short default_box_drawing_style;
             static bool default_line_merging_preference;
+            static bool default_line_trimming_preference;
 
         public:
             // \brief A number representing one of the first 16 color pairs initialized upon startup (names assume that nothing was changed)
@@ -769,16 +770,16 @@ namespace bengine {
              * \param style Combination value that encodes the main style of the line (light, heavy, doubled, etc) as well as the dashing style (none, double, triple, etc)
              * \param color The color pair to use for the line
              * \param attributes Attributes for each cell in the line, though many don't actually affect anything; all cells changed by this function will have the attribute of BOX_DRAWING_MERGABLE added to them
-             * \param merge_with_other_lines Whether this new line should merge with other box drawing characters if encountered (but only if they're mergable as well)
+             * \param trim_ends Whether the line's first and last characters should extend the full character or not (mainly useful when making corners or tees)
+             * \param merge_with_other_lines Whether this new line should merge with other box drawing characters if encountered (but only if they're mergable as well); if false then `trim_ends` doesn't have an effect
              * \returns A coordinate pair corresponding to the last character drawn in the line
              */
-            std::pair<unsigned short, unsigned short> draw_horizontal_line(unsigned short x, const unsigned short &y, int length, const unsigned short &style, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes, const bool &merge_with_other_lines = bengine::curses_window::default_line_merging_preference) {
+            std::pair<unsigned short, unsigned short> draw_horizontal_line(unsigned short x, const unsigned short &y, int length, const unsigned short &style, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes, const bool &trim_ends = bengine::curses_window::default_line_trimming_preference, const bool &merge_with_other_lines = bengine::curses_window::default_line_merging_preference) {
                 // minimum length of a line is 1 since length is measured in characters, also yeah the line needs to be at the right y-level to even have a chance of being within the window
                 if (length == 0 || y >= this->get_height()) {
                     return {x, y};
                 }
-
-                std::pair<unsigned short, unsigned short> output = {x, y};
+                unsigned short output_x = x;
 
                 // set x and length to values that ensures that length is a positive number
                 if (length < 0) {
@@ -789,18 +790,16 @@ namespace bengine {
                     } else {
                         x -= length - 1;
                         if (x >= this->get_width()) {
-                            return output;
+                            return {output_x, y};
                         }
                     }
-                    output.first = x - length + 1;
                 } else if (x >= this->get_width()) {
-                    return output;
-                } else {
-                    // trim the line if it extends beyond the window's bounds
-                    // this code segment can make the line length negative again, but only when x is beyond the window (which this code doesn't execute is that's the case)
-                    if (x + length - 1 >= this->get_width()) {
-                        length = this->get_width() - x;
-                    }
+                    return {x, y};
+                }
+                // trim the line if it extends beyond the window's bounds
+                // this code segment can make the line length negative again, but only when x is beyond the window (which this code doesn't execute is that's the case)
+                if (x + length - 1 >= this->get_width()) {
+                    length = this->get_width() - x;
                 }
 
                 const unsigned char main_style = bengine::curses_window::extract_main_style(style, true);
@@ -811,61 +810,53 @@ namespace bengine {
                 if (!merge_with_other_lines) {
                     const wchar_t line_char = bengine::curses_window::find_character_with_style_values(0, main_style, main_style, 0, main_style, dash_style, use_hard_corners);
                     for (unsigned short i = 0; i < length; i++) {
-                        this->write_character(x + i, y, line_char, {color, static_cast<unsigned short>(attributes | BOX_DRAWING_MERGABLE), 0, 0});
+                        this->write_character(x++, y, line_char, {color, static_cast<unsigned short>(attributes | BOX_DRAWING_MERGABLE), 0, 0});
                     }
-                    return {output.first + length - 1, output.second};
+                    return {output_x, y};
                 }
 
-                for (unsigned short i = 0; i < length; i++) {
-                    unsigned char neighbors = (bengine::curses_window::extract_style_from_character(this->get_cell_character(x, y - 1), 3) << 6) + bengine::curses_window::extract_style_from_character(this->get_cell_character(x, y + 1), 0);
-
-                    if (i == 0 && neighbors != 0) {
-                        neighbors += bengine::curses_window::extract_style_from_character(this->get_cell_character(x - 1, y), 2) << 4;
-                    } else {
-                        neighbors += main_style << 4;
+                if (trim_ends) {
+                    if (length == 1) {
+                        return {output_x, y};
                     }
-                    if (i == length - 1 && (bengine::bitwise_manipulator::get_subvalue(neighbors, 6, 2) != 0 || bengine::bitwise_manipulator::get_subvalue(neighbors, 0, 2) != 0)) {
-                        neighbors += bengine::curses_window::extract_style_from_character(this->get_cell_character(x + 1, y), 1) << 2;
-                    } else {
-                        neighbors += main_style << 2;
-                    }
-
-                    wchar_t piece = bengine::curses_window::find_character_with_style_values(neighbors, main_style, dash_style, use_hard_corners);
-
-                    this->write_string(0, i * 4, bengine::string_helper::to_wstring(bengine::string_helper::to_string_with_added_zeros(static_cast<int>(i), 3, 0, false) + ":"));
-                    this->write_string(5, i * 4, bengine::string_helper::to_wstring(bengine::bitwise_manipulator::get_subvalue(neighbors, 6, 2)));
-                    this->write_string(4, i * 4 + 1, bengine::string_helper::to_wstring(bengine::bitwise_manipulator::get_subvalue(neighbors, 4, 2)));
-                    this->write_string(6, i * 4 + 1, bengine::string_helper::to_wstring(bengine::bitwise_manipulator::get_subvalue(neighbors, 2, 2)));
-                    this->write_string(5, i * 4 + 2, bengine::string_helper::to_wstring(bengine::bitwise_manipulator::get_subvalue(neighbors, 0, 2)));
-                    this->write_character(5, i * 4 + 1, piece);
-
-                    this->write_character(x, y, piece, {color, static_cast<unsigned short>(attributes | BOX_DRAWING_MERGABLE), 0, 0});
-                    x++;
+                    const unsigned char neighbors = (bengine::curses_window::extract_style_from_character(this->get_cell_character(x, y - 1), 3) << 6) + (main_style << 2) + bengine::curses_window::extract_style_from_character(this->get_cell_character(x, y + 1), 0);
+                    this->write_character(x++, y, bengine::curses_window::find_character_with_style_values(neighbors, main_style, dash_style, use_hard_corners), {color, static_cast<unsigned short>(attributes | BOX_DRAWING_MERGABLE), 0, 0});
                 }
 
-                return {x, output.second};
+                for (unsigned short i = trim_ends + trim_ends; i < length; i++) {
+                    const unsigned char neighbors = (bengine::curses_window::extract_style_from_character(this->get_cell_character(x, y - 1), 3) << 6) + (main_style << 4) + (main_style << 2) + bengine::curses_window::extract_style_from_character(this->get_cell_character(x, y + 1), 0);
+                    this->write_character(x++, y, bengine::curses_window::find_character_with_style_values(neighbors, main_style, dash_style, use_hard_corners), {color, static_cast<unsigned short>(attributes | BOX_DRAWING_MERGABLE), 0, 0});
+                }
+
+                if (trim_ends) {
+                    const unsigned char neighbors = (bengine::curses_window::extract_style_from_character(this->get_cell_character(x, y - 1), 3) << 6) + (main_style << 4) + bengine::curses_window::extract_style_from_character(this->get_cell_character(x, y + 1), 0);
+                    this->write_character(x, y, bengine::curses_window::find_character_with_style_values(neighbors, main_style, dash_style, use_hard_corners), {color, static_cast<unsigned short>(attributes | BOX_DRAWING_MERGABLE), 0, 0});
+                }
+
+                return {output_x, y};
             }
-            std::pair<unsigned short, unsigned short> draw_vertical_line(const unsigned short &x, unsigned short y, int length, const unsigned short &style, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes, const bool &merge_with_other_lines = bengine::curses_window::default_line_merging_preference) {
+            std::pair<unsigned short, unsigned short> draw_horizontal_line(const std::pair<unsigned short, unsigned short> &pos, int length, const unsigned short &style, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes, const bool &trim_ends = bengine::curses_window::default_line_trimming_preference, const bool &merge_with_other_lines = bengine::curses_window::default_line_merging_preference) {
+                return this->draw_horizontal_line(pos.first, pos.second, length, style, color, attributes, trim_ends, merge_with_other_lines);
+            }
+            std::pair<unsigned short, unsigned short> draw_vertical_line(const unsigned short &x, const unsigned short &y, int length, const unsigned short &style, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes, const bool &trim_ends = bengine::curses_window::default_line_trimming_preference, const bool &merge_with_other_lines = bengine::curses_window::default_line_merging_preference) {
                 if (length == 0 || x >= this->get_width()) {
                     return {x, y};
                 }
-
-                std::pair<unsigned short, unsigned short> output = {x, y};
+                unsigned short current_y = y;
 
                 if (length < 0) {
                     length = -length;
                     if (length > y + 1) {
                         length = y + 1;
-                        y = 0;
+                        current_y = 0;
                     } else {
-                        y -= length - 1;
+                        current_y -= length - 1;
                         if (y >= this->get_height()) {
-                            return output;
+                            return {x, y};
                         }
                     }
-                    output.second = y - length + 1;
                 } else if (y >= this->get_height()) {
-                    return output;
+                    return {x, y};
                 } else {
                     if (y + length - 1 >= this->get_height()) {
                         length = this->get_height() - y;
@@ -879,39 +870,33 @@ namespace bengine {
                 if (!merge_with_other_lines) {
                     const wchar_t line_char = bengine::curses_window::find_character_with_style_values(main_style, 0, 0, main_style, main_style, dash_style, use_hard_corners);
                     for (unsigned short i = 0; i < length; i++) {
-                        this->write_character(x, y + i, line_char, {color, static_cast<unsigned short>(attributes | BOX_DRAWING_MERGABLE), 0, 0});
+                        this->write_character(x, current_y++, line_char, {color, static_cast<unsigned short>(attributes | BOX_DRAWING_MERGABLE), 0, 0});
                     }
-                    return {output.first, output.second + length - 1};
+                    return {x, current_y};
                 }
 
-                for (unsigned short i = 0; i < length; i++) {
-                    unsigned char neighbors = (bengine::curses_window::extract_style_from_character(this->get_cell_character(x - 1, y), 2) << 4) + (bengine::curses_window::extract_style_from_character(this->get_cell_character(x + 1, y), 1) << 2);
-
-                    if (i == 0 && neighbors != 0) {
-                        neighbors += bengine::curses_window::extract_style_from_character(this->get_cell_character(x, y - 1), 3);
-                    } else {
-                        neighbors += main_style;
+                if (trim_ends) {
+                    if (length == 1) {
+                        return {x, y};
                     }
-                    if (i == length - 1 && (bengine::bitwise_manipulator::get_subvalue(neighbors, 4, 2) != 0 || bengine::bitwise_manipulator::get_subvalue(neighbors, 2, 2) != 0)) {
-                        neighbors += bengine::curses_window::extract_style_from_character(this->get_cell_character(x, y + 1), 0) << 6;
-                    } else {
-                        neighbors += main_style << 6;
-                    }
-
-                    wchar_t piece = bengine::curses_window::find_character_with_style_values(neighbors, main_style, dash_style, use_hard_corners);
-
-                    this->write_string(0, i * 4, bengine::string_helper::to_wstring(bengine::string_helper::to_string_with_added_zeros(static_cast<int>(i), 3, 0, false) + ":"));
-                    this->write_string(5, i * 4, bengine::string_helper::to_wstring(bengine::bitwise_manipulator::get_subvalue(neighbors, 6, 2)));
-                    this->write_string(4, i * 4 + 1, bengine::string_helper::to_wstring(bengine::bitwise_manipulator::get_subvalue(neighbors, 4, 2)));
-                    this->write_string(6, i * 4 + 1, bengine::string_helper::to_wstring(bengine::bitwise_manipulator::get_subvalue(neighbors, 2, 2)));
-                    this->write_string(5, i * 4 + 2, bengine::string_helper::to_wstring(bengine::bitwise_manipulator::get_subvalue(neighbors, 0, 2)));
-                    this->write_character(5, i * 4 + 1, piece);
-
-                    this->write_character(x, y, piece, {color, static_cast<unsigned short>(attributes | BOX_DRAWING_MERGABLE), 0, 0});
-                    y++;
+                    const unsigned char neighbors = (bengine::curses_window::extract_style_from_character(this->get_cell_character(x - 1, current_y), 2) << 4) + (bengine::curses_window::extract_style_from_character(this->get_cell_character(x + 1, current_y), 1) << 2) + main_style;
+                    this->write_character(x, current_y++, bengine::curses_window::find_character_with_style_values(neighbors, main_style, dash_style, use_hard_corners), {color, static_cast<unsigned short>(attributes | BOX_DRAWING_MERGABLE), 0, 0});
                 }
 
-                return {output.first, y};
+                for (unsigned short i = trim_ends + trim_ends; i < length; i++) {
+                    const unsigned char neighbors = (main_style << 6) + (bengine::curses_window::extract_style_from_character(this->get_cell_character(x - 1, current_y), 2) << 4) + (bengine::curses_window::extract_style_from_character(this->get_cell_character(x + 1, current_y), 1) << 2) + main_style;
+                    this->write_character(x, current_y++, bengine::curses_window::find_character_with_style_values(neighbors, main_style, dash_style, use_hard_corners), {color, static_cast<unsigned short>(attributes | BOX_DRAWING_MERGABLE), 0, 0});
+                }
+
+                if (trim_ends) {
+                    const unsigned char neighbors = (main_style << 6) + (bengine::curses_window::extract_style_from_character(this->get_cell_character(x - 1, current_y), 2) << 4) + (bengine::curses_window::extract_style_from_character(this->get_cell_character(x + 1, current_y), 1) << 2);
+                    this->write_character(x, current_y, bengine::curses_window::find_character_with_style_values(neighbors, main_style, dash_style, use_hard_corners), {color, static_cast<unsigned short>(attributes | BOX_DRAWING_MERGABLE), 0, 0});
+                }
+
+                return {x, current_y};
+            }
+            std::pair<unsigned short, unsigned short> draw_vertical_line(const std::pair<unsigned short, unsigned short> &pos, int length, const unsigned short &style, const unsigned char &color = bengine::curses_window::default_cell_color_pair, const unsigned short &attributes = bengine::curses_window::default_cell_attributes, const bool &trim_ends = bengine::curses_window::default_line_trimming_preference, const bool &merge_with_other_lines = bengine::curses_window::default_line_merging_preference) {
+                return this->draw_vertical_line(pos.first, pos.second, length, style, color, attributes, trim_ends, merge_with_other_lines);
             }
     };
     unsigned char bengine::curses_window::default_cell_color_pair = bengine::curses_window::preset_colors::WHITE;
@@ -924,6 +909,7 @@ namespace bengine {
     unsigned short bengine::curses_window::default_box_drawing_style = bengine::curses_window::box_drawing_styles::LIGHT_SQUARE | bengine::curses_window::box_drawing_styles::NO_DASH;
 
     bool bengine::curses_window::default_line_merging_preference = true;
+    bool bengine::curses_window::default_line_trimming_preference = true;
     const std::wstring bengine::curses_window::box_drawing_key = L"╷╻╻╶┌┎╓╺┍┏┏╺╒┏╔╴┐┒╖─┬┰╥╼┮┲┲╼┮┲┲╸┑┓┓╾┭┱┱━┯┳┳━┯┳┳╸╕┓╗╾┱┱┱━┯┳┳═╤┳╦╵│╽╽└├┟┟┕┝┢┢╘╞┢┢┘┤┧┧┴┼╁╁┶┾╆╆┶┾╆╆┙┥┪┪┵┽╅╅┷┿╈╈┷┿╈╈╛╡┪┪┵┽╅╅┷┿╈╈╧╪╈╈╹╿┃┃┖┞┠┠┗┡┣┣┗┡┣┣┚┦┨┨┸╀╂╂┺╄╊╊┺╄╊╊┛┩┫┫┹╃╉╉┻╇╋╋┻╇╋╋┛┩┫┫┹╃╉╉┻╇╋╋┻╇╋╋╹╿┃║╙┞┠╟┗┡┣┣╚┡┣╠╜┦┨╢╨╀╂╫┺╄╊╊┺╄╊╊┛┩┫┫┹╃╉╉┻╇╋╋┻╇╋╋╝┩┫╣┹╃╉╉┻╇╋╋╩╇╋╬";
     const std::wstring bengine::curses_window::box_drawing_key_alt = L"╷╻║╶┌┎╓╺┍┏╔═╒╔╔╴┐┒╖─┬┰╥╼┮┲╦═╤╦╦╸┑┓╗╾┭┱╦━┯┳╦═╤╦╦═╕╗╗═╤╦╦═╤╦╦═╤╦╦╵│╽║└├┟╟┕┝┢╠╘╞╠╠┘┤┧╢┴┼╁╫┶┾╆╬╧╪╬╬┙┥┪╣┵┽╅╬┷┿╈╬╧╪╬╬╛╡╣╣╧╪╬╬╧╪╬╬╧╪╬╬╹╿┃║┖┞┠╟┗┡┣╠╚╠╠╠┚┦┨╢┸╀╂╫┺╄╊╬╩╬╬╬┘┩┫╣┹╃╉╬┻╇╋╬╩╬╬╬╝╣╣╣╩╬╬╬╩╬╬╬╩╬╬╬║║║║╙╟╟╟╚╠╠╠╚╠╠╠╜╢╢╢╨╫╫╫╩╬╬╬╩╬╬╬╝╣╣╣╩╬╬╬╩╬╬╬╩╬╬╬╝╣╣╣╩╬╬╬╩╬╬╬╩╬╬╬";
     const std::vector<std::vector<std::wstring>> bengine::curses_window::matrix_text_key = {
