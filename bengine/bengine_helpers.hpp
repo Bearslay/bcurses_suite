@@ -715,6 +715,110 @@ namespace bengine {
     // \brief A class containing useful functions that make converting from arithmetic data types to strings with various formatting additions easy as well as converting strings to numbers
     class string_helper {
         public:
+            /** Wrap an input string without trying to keep words together or remove leading spaces
+             * \tparam charT Character type used in various `std::basic_string` derivatives; use `char` for `std::string`, `wchar_t` for `std::wstring`, etc
+             * \param input Input string to wrap
+             * \param wrap_width The width that each line in the output string won't exceed (0 indicates no wrapping)
+             * \returns A string that is wrapped using `\n`
+             */
+            template <class charT>
+            static std::basic_string<charT> crude_wrap(const std::basic_string<charT> &input, const unsigned int &wrap_width) {
+                if (wrap_width == 0) {
+                    return input;
+                }
+                std::basic_string<charT> output;
+                for (std::size_t i = 0; i < input.length(); ) {
+                    // scan for existing newline characters that would normally mess with line widths
+                    std::size_t newline_index = input.find('\n', i);
+                    // if a newline shows up before the line is meant to wrap, then the line needs to wrap early and `i` needs to be incremented differently
+                    if (newline_index < i + wrap_width) {
+                        output += input.substr(i, newline_index - i + 1);
+                        i += newline_index - i + 1;
+                        continue;
+                    }
+                    output += input.substr(i, wrap_width) + '\n';
+                    i += wrap_width;
+                }
+                // unless the final character of the input is a newline, the algorithm always adds an unwanted newline that should be removed
+                return input.back() == '\n' ? output : output.substr(0, output.length() - 1);
+            }
+
+            /** Wrap an input string while removing leading spaces in each line and potentially split words
+             * \tparam charT Character type used in various `std::basic_string` derivatives; use `char` for `std::string`, `wchar_t` for `std::wstring`, etc
+             * \param input Input string to wrap
+             * \param wrap_width The width that each line in the output string won't exceed (0 indicates no wrapping)
+             * \returns A string that is wrapped using `\n` without spaces at the start of lines
+             */
+            template <class charT>
+            static std::basic_string<charT> basic_wrap(const std::basic_string<charT> &input, const unsigned int &wrap_width) {
+                if (wrap_width == 0) {
+                    return input;
+                }
+                std::basic_string<charT> output;
+                for (std::size_t i = 0; i < input.length(); ) {
+                    std::size_t newline_index = input.find('\n', i);
+                    if (newline_index < i + wrap_width) {
+                        output += input.substr(i, newline_index - i + 1);
+                        i += newline_index - i + 1;
+                    } else {
+                        output += input.substr(i, wrap_width) + '\n';
+                        i += wrap_width;
+                    }
+                    // remove any extra leading spaces on a line; also has the effect of removing other redundant spaces (yay)
+                    while (i < input.length() && input.at(i) == ' ') {
+                        i++;
+                    }
+                }
+                return input.back() == '\n' ? output : output.substr(0, output.length() - 1);
+            }
+
+            /** Wrap an input string while removing leading spaces in each line and without splitting words (most typical wrapping seen)
+             * \tparam charT Character type used in various `std::basic_string` derivatives; use `char` for `std::string`, `wchar_t` for `std::wstring`, etc
+             * \param input Input string to wrap
+             * \param wrap_width The width that each line in the output string won't exceed (0 indicates no wrapping)
+             * \returns A string that is wrapped using `\n` without spaces at the start of lines or split words
+             */
+            template <class charT>
+            static std::basic_string<charT> fancy_wrap(const std::basic_string<charT> &input, const unsigned int &wrap_width) {
+                if (wrap_width == 0) {
+                    return input;
+                }
+                std::basic_string<charT> output;
+                for (std::size_t i = 0; i < input.length(); ) {
+                    const std::size_t newline_index = input.find('\n', i);
+                    if (newline_index < i + wrap_width) {
+                        output += input.substr(i, newline_index - i + 1);
+                        i += newline_index - i + 1;
+                    } else {
+                        // if the last character in the line is a space or
+                        // the first character of the next line is a space then no extra work is needed
+                        // this statement also runs if there are no more characters after the current line
+                        if (i + wrap_width >= input.length() || input.at(i + wrap_width - 1) == ' ' || input.at(i + wrap_width) == ' ') {
+                            output += input.substr(i, wrap_width) + '\n';
+                            i += wrap_width;
+                        }
+                        // this runs if it is determined that the line break occurs in between at least 2 letters
+                        else {
+                            const std::size_t space_index = input.rfind(' ', i + wrap_width < input.length() ? i + wrap_width : input.length() - 1);
+                            // either there are no spaces, or there isn't a space in the current line
+                            if (space_index == std::string::npos || space_index < i) {
+                                output += input.substr(i, wrap_width) + '\n';
+                                i += wrap_width;
+                            }
+                            // a space is found in the current line, providing a breakpoint
+                            else {
+                                output += input.substr(i, space_index - i) + '\n';
+                                i += space_index - i + 1;
+                            }
+                        }
+                    }
+                    while (i < input.length() && input.at(i) == ' ') {
+                        i++;
+                    }
+                }
+                return input.back() == '\n' ? output : output.substr(0, output.length() - 1);
+            }
+
             struct number_formats {
                 unsigned int min_width = 0;
                 unsigned int max_width = 0;
